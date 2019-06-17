@@ -35,7 +35,7 @@ class TestNdexbiogridloader(unittest.TestCase):
 
         self._the_args = {
             'profile': 'ndexbiogridloader',
-            'biogridversion': '3.5.172',
+            'biogridversion': '3.5.173',
             'datadir': self.__class__._biogrid_files_dir,
             'organismloadplan': ndexloadbiogrid.get_organism_load_plan(),
             'chemicalloadplan': ndexloadbiogrid.get_chemical_load_plan()
@@ -67,12 +67,19 @@ class TestNdexbiogridloader(unittest.TestCase):
         ]
 
         self.__class__._style = {
-            'protein_uuid': '584f67d3-817b-11e9-917e-525400c25d22',
-            'chem_uuid': '5df4b7d5-817b-11e9-917e-525400c25d22'
+            'protein_uuid': '5b25420b-9120-11e9-95a1-525400c25d22',
+            'chem_uuid': '1243eb96-9121-11e9-95a1-525400c25d22'
         }
 
         self.__class__._ndex = self.NdexBioGRIDLoader._create_ndex_connection()
         self.assertIsNotNone(self.__class__._ndex, 'Unable to to create NDEx client connection')
+
+
+        status_code = self.NdexBioGRIDLoader._download_biogrid_files()
+        self.assertEqual(status_code, 0, 'Unable to download required biogrid files ')
+
+        net_summaries, status_code = self.NdexBioGRIDLoader._load_network_summaries_for_user()
+        self.assertEqual(status_code, 0, 'Unable to get netwok summaries')
 
 
 
@@ -93,34 +100,15 @@ class TestNdexbiogridloader(unittest.TestCase):
         """Tear down test fixtures, if any."""
 
 
-    @unittest.skip("skipping test_02")
-    def test_02_header_for_generated_tsv_file(self):
 
-        expected_header =  [
-            'Entrez Gene Interactor A',
-            'Entrez Gene Interactor B',
-            'Official Symbol Interactor A',
-            'Official Symbol Interactor B',
-            'Synonyms Interactor A',
-            'Synonyms Interactor B',
-            'Experimental System',
-            'Experimental System Type',
-            'Pubmed ID',
-            'Throughput',
-            'Score',
-            'Modification',
-            'Phenotypes',
-            'Qualifications',
-            'Organism Interactor A',
-            'Organism Interactor B',
-        ]
-        actual_header = self.NdexBioGRIDLoader._get_header_for_generating_organism_tsv()
 
-        self.assertListEqual(expected_header, actual_header)
+    #@unittest.skip("skipping test_10")
+    def test_10_using_panda_generate_organism_CX_and_upload(self):
 
-    @unittest.skip("skipping test_03")
-    def test_03_check_biogrid_organism_file_format(self):
-        expected_header = [
+        protein_template, status_code = self.NdexBioGRIDLoader._get_network_from_NDEx(self.__class__._style['protein_uuid'])
+        self.assertEqual(status_code, 0, 'Unable to get protein style network UUID ' + self.__class__._style['protein_uuid'])
+
+        expected_organism_header = [
             '#BioGRID Interaction ID',
             'Entrez Gene Interactor A',
             'Entrez Gene Interactor B',
@@ -151,40 +139,97 @@ class TestNdexbiogridloader(unittest.TestCase):
 
             file_name = self.NdexBioGRIDLoader._get_biogrid_file_name(entry)
 
-            status_code, file_path = self.NdexBioGRIDLoader._unzip_biogrid_file(file_name, 'organism')
+            status_code, biogrid_organism_file_path = self.NdexBioGRIDLoader._unzip_biogrid_file(file_name, 'organism')
 
             with self.subTest():
                 self.assertEqual(status_code, 0, 'Unable to extract ' + file_name + ' from archive')
 
-                with open(file_path) as f_read:
+                header, status_code_1 = self.NdexBioGRIDLoader._get_header(biogrid_organism_file_path)
+                self.assertEqual(status_code_1, 0, 'Unable to get header from ' + biogrid_organism_file_path)
+                self.assertListEqual(expected_organism_header, header)
 
-                    header = f_read.readline().strip()
-                    header_split = header.split('\t')
+                biogrid_organism_CX_path, network_name, status_code_1  = \
+                    self.NdexBioGRIDLoader._using_panda_generate_CX(biogrid_organism_file_path, entry, protein_template, 'organism')
 
-                    self.assertListEqual(expected_header, header_split)
+                self.assertEqual(status_code_1, 0, 'Unable to generate CX from ' + biogrid_organism_file_path)
+                self.assertIsNotNone(biogrid_organism_CX_path, 'No path for CX file generated from ' + file_name)
 
-            if status_code == 0:
-                self.NdexBioGRIDLoader._remove_biogrid_organism_file(file_path)
-
-
-    @unittest.skip("skipping test_04")
-    def test_04_get_style_templates_from_NDEx(self):
-        protein_template, status_code = self.NdexBioGRIDLoader._get_network_from_NDEx(self.__class__._style['protein_uuid'])
-        self.assertEqual(status_code, 0, 'Unable to get protein style network UUID ' + self.__class__._style['protein_uuid'])
-
-        chem_template, status_code = self.NdexBioGRIDLoader._get_network_from_NDEx(self.__class__._style['chem_uuid'])
-        self.assertEqual(status_code, 0, 'Unable to get chem style network UUID ' + self.__class__._style['chem_uuid'])
-
-
-    @unittest.skip("skipping test_05")
-    def test_05_get_network_summaries(self):
-        net_summaries, status_code = self.NdexBioGRIDLoader._load_network_summaries_for_user()
-        self.assertEqual(status_code, 0, 'Unable to get netwok summaries')
+                status_code1 = self.NdexBioGRIDLoader._upload_CX(biogrid_organism_CX_path, network_name)
+                self.assertEqual(status_code_1, 0, 'Unable to upload ' + network_name)
 
 
 
-    @unittest.skip("skipping test_06")
-    def test_06_generate_organism_CX_and_upload(self):
+    #@unittest.skip("skipping test_20")
+    def test_20_using_panda_generate_chemical_CX_and_upload(self):
+
+        chemical_template, status_code = self.NdexBioGRIDLoader._get_network_from_NDEx(self.__class__._style['chem_uuid'])
+        self.assertEqual(status_code, 0, 'Unable to get chemicals style network UUID ' + self.__class__._style['chem_uuid'])
+
+        expected_chemical_header = [
+            '#BioGRID Chemical Interaction ID',
+            'BioGRID Gene ID',
+            'Entrez Gene ID',
+            'Systematic Name',
+            'Official Symbol',
+            'Synonyms',
+            'Organism ID',
+            'Organism',
+            'Action',
+            'Interaction Type',
+            'Author',
+            'Pubmed ID',
+            'BioGRID Publication ID',
+            'BioGRID Chemical ID',
+            'Chemical Name',
+            'Chemical Synonyms',
+            'Chemical Brands',
+            'Chemical Source',
+            'Chemical Source ID',
+            'Molecular Formula',
+            'Chemical Type',
+            'ATC Codes',
+            'CAS Number',
+            'Curated By',
+            'Method',
+            'Method Description',
+            'Related BioGRID Gene ID',
+            'Related Entrez Gene ID',
+            'Related Systematic Name',
+            'Related Official Symbol',
+            'Related Synonyms',
+            'Related Organism ID',
+            'Related Organism',
+            'Related Type',
+            'Notes'
+        ]
+
+
+        for entry in self.chemicals_file_entries:
+
+            file_name = self.NdexBioGRIDLoader._get_biogrid_chemicals_file_name(entry)
+
+            status_code, biogrid_chemicals_file_path = self.NdexBioGRIDLoader._unzip_biogrid_file(file_name, 'chemicals')
+
+            with self.subTest():
+                self.assertEqual(status_code, 0, 'Unable to extract ' + file_name + ' from archive')
+
+                header, status_code_1 = self.NdexBioGRIDLoader._get_header(biogrid_chemicals_file_path)
+                self.assertEqual(status_code_1, 0, 'Unable to get header from ' + biogrid_chemicals_file_path)
+                self.assertListEqual(expected_chemical_header, header)
+
+                biogrid_chemical_CX_path, network_name, status_code_1  = \
+                    self.NdexBioGRIDLoader._using_panda_generate_CX(biogrid_chemicals_file_path, entry, chemical_template, 'chemical')
+
+                self.assertEqual(status_code_1, 0, 'Unable to generate CX from ' + biogrid_chemicals_file_path)
+                self.assertIsNotNone(biogrid_chemical_CX_path, 'No path for CX file generated from ' + file_name)
+
+                status_code1 = self.NdexBioGRIDLoader._upload_CX(biogrid_chemical_CX_path, network_name)
+                self.assertEqual(status_code_1, 0, 'Unable to upload ' + network_name)
+
+
+
+    @unittest.skip("skipping test_30")
+    def test_30_generate_organism_CX_and_upload(self):
 
         status_code = self.NdexBioGRIDLoader._download_biogrid_files()
         self.assertEqual(status_code, 0, 'Unable to download required biogrid files ')
@@ -245,7 +290,7 @@ class TestNdexbiogridloader(unittest.TestCase):
                 self.assertListEqual(expected_organism_header, header)
 
 
-                biogrid_organism_CX_path, network_name, status_code_1, = \
+                biogrid_organism_CX_path, network_name, status_code_1 = \
                     self.NdexBioGRIDLoader._generate_CX_from_biogrid_organism_file(biogrid_organism_file_path, entry, \
                                                                                    protein_template)
                 self.assertEqual(status_code_1, 0, 'Unable to generate CX from ' + biogrid_organism_file_path)
@@ -253,138 +298,5 @@ class TestNdexbiogridloader(unittest.TestCase):
 
                 status_code1 = self.NdexBioGRIDLoader._upload_CX(biogrid_organism_CX_path, network_name)
                 self.assertEqual(status_code_1, 0, 'Unable to upload ' + network_name)
-
-
-
-
-    #@unittest.skip("skipping test_07")
-    def test_07_using_panda_generate_CX_network_from_biogrid_organism_files(self):
-
-        protein_template, status_code = self.NdexBioGRIDLoader._get_network_from_NDEx(self.__class__._style['protein_uuid'])
-        self.assertEqual(status_code, 0, 'Unable to get protein style network UUID ' + self.__class__._style['protein_uuid'])
-
-        net_summaries, status_code = self.NdexBioGRIDLoader._load_network_summaries_for_user()
-        self.assertEqual(status_code, 0, 'Unable to get netwok summaries')
-
-        template_uuid = self.__class__._style['protein_uuid']
-
-        iteration = 1
-        for entry in self.organism_file_entries:
-            # if 1 != iteration:
-            #    continue
-            iteration += 1
-
-            file_name = self.NdexBioGRIDLoader._get_biogrid_file_name(entry)
-
-            status_code, biogrid_organism_file_path = self.NdexBioGRIDLoader._unzip_biogrid_file(file_name, 'organism')
-
-            with self.subTest():
-                self.assertEqual(status_code, 0, 'Unable to extract ' + file_name + ' from archive')
-
-                status_code_1 = self.NdexBioGRIDLoader._using_panda_generate_and_upload_CX(\
-                        biogrid_organism_file_path, entry, protein_template, template_uuid, 'organism')
-
-                self.assertEqual(status_code_1, 0, 'Unable to generate CX from ' + biogrid_organism_file_path)
-
-
-    #@unittest.skip("skipping test_08")
-    def test_08_using_panda_generate_CX_network_from_biogrid_chemical_files(self):
-
-        chem_template, status_code = self.NdexBioGRIDLoader._get_network_from_NDEx(self.__class__._style['chem_uuid'])
-        self.assertEqual(status_code, 0, 'Unable to get protein style network UUID ' + self.__class__._style['chem_uuid'])
-
-        net_summaries, status_code = self.NdexBioGRIDLoader._load_network_summaries_for_user()
-        self.assertEqual(status_code, 0, 'Unable to get netwok summaries')
-
-        template_uuid = self.__class__._style['chem_uuid']
-
-        iteration = 1
-        for entry in self.chemicals_file_entries:
-            # if 1 != iteration:
-            #    continue
-            iteration += 1
-
-            file_name = self.NdexBioGRIDLoader._get_biogrid_chemicals_file_name(entry)
-
-            status_code, biogrid_chemical_file_path = self.NdexBioGRIDLoader._unzip_biogrid_file(file_name, 'chemical')
-
-            with self.subTest():
-                self.assertEqual(status_code, 0, 'Unable to extract ' + file_name + ' from archive')
-
-                status_code_1 = self.NdexBioGRIDLoader._using_panda_generate_and_upload_CX(\
-                        biogrid_chemical_file_path, entry, chem_template, template_uuid, 'chemical')
-
-                self.assertEqual(status_code_1, 0, 'Unable to generate CX from ' + biogrid_chemical_file_path)
-
-
-
-    @unittest.skip("skipping test_21")
-    def test_20_generate_chemicals_CX_and_upload(self):
-
-        expected_chemical_header = [
-            '#BioGRID Chemical Interaction ID',
-            'BioGRID Gene ID',
-            'Entrez Gene ID',
-            'Systematic Name',
-            'Official Symbol',
-            'Synonyms',
-            'Organism ID',
-            'Organism',
-            'Action',
-            'Interaction Type',
-            'Author',
-            'Pubmed ID',
-            'BioGRID Publication ID',
-            'BioGRID Chemical ID',
-            'Chemical Name',
-            'Chemical Synonyms',
-            'Chemical Brands',
-            'Chemical Source',
-            'Chemical Source ID',
-            'Molecular Formula',
-            'Chemical Type',
-            'ATC Codes',
-            'CAS Number',
-            'Curated By',
-            'Method',
-            'Method Description',
-            'Related BioGRID Gene ID',
-            'Related Entrez Gene ID',
-            'Related Systematic Name',
-            'Related Official Symbol',
-            'Related Synonyms',
-            'Related Organism ID',
-            'Related Organism',
-            'Related Type',
-            'Notes'
-        ]
-
-        net_summaries, status_code = self.NdexBioGRIDLoader._load_network_summaries_for_user()
-        self.assertEqual(status_code, 0, 'Unable to get netwok summaries')
-
-        chemical_template, status_code = self.NdexBioGRIDLoader._get_network_from_NDEx(self.__class__._style['chem_uuid'])
-        self.assertEqual(status_code, 0, 'Unable to get chemicals style network UUID ' + self.__class__._style['chem_uuid'])
-
-
-        for entry in self.chemicals_file_entries:
-
-            file_name = self.NdexBioGRIDLoader._get_biogrid_chemicals_file_name(entry)
-
-            status_code, biogrid_chemicals_file_path = self.NdexBioGRIDLoader._unzip_biogrid_file(file_name, 'chemicals')
-
-            with self.subTest():
-                self.assertEqual(status_code, 0, 'Unable to extract ' + file_name + ' from archive')
-
-                header, status_code_1 = self.NdexBioGRIDLoader._get_header(biogrid_chemicals_file_path)
-                self.assertEqual(status_code_1, 0, 'Unable to get header from ' + biogrid_chemicals_file_path)
-                self.assertListEqual(expected_chemical_header, header)
-
-                biogrid_chemicals_CX_path, network_name, status_code_1, = \
-                    self.NdexBioGRIDLoader._generate_CX_from_biogrid_chemicals_file(biogrid_chemicals_file_path, entry, \
-                                                                                    chemical_template)
-                self.assertEqual(status_code_1, 0, 'Unable to generate CX from ' + biogrid_chemicals_file_path)
-
-
-
 
 

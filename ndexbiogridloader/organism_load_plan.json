@@ -16,7 +16,12 @@
 
              {  "column_name": "Synonyms Interactor A",
                 "attribute_name": "alias",
-                "delimiter" : "|" }
+                "delimiter" : "|" },
+
+            {
+                "attribute_name": "type",
+                "default_value": "protein"
+            }
            ]
     },
     "target_plan":
@@ -32,12 +37,16 @@
              {  "column_name": "Synonyms Interactor B",
                 "attribute_name": "alias",
                 "delimiter" : "|"
+             },
+             {
+                "attribute_name": "type",
+                "default_value": "protein"
              }
            ]
     },
     "edge_plan":
     {
-        "default_predicate": "Interacts with",
+        "default_predicate": "interacts-with",
         "property_columns": [
                {
                     "column_name": "Experimental System",

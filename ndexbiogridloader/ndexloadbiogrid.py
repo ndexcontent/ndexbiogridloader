@@ -564,7 +564,7 @@ class NdexBioGRIDLoader(object):
 
 
 
-    def _generate_CX_from_TSV(self, file_path, tsv_file_path, template, organism_or_chemical_entry, type='organism'):
+    '''def _generate_CX_from_TSV(self, file_path, tsv_file_path, template, organism_or_chemical_entry, type='organism'):
 
         cx_file_path, cx_file_name = self._get_CX_file_path_and_name(file_path, organism_or_chemical_entry, type)
 
@@ -608,7 +608,7 @@ class NdexBioGRIDLoader(object):
                     print('{} - finished generating {}'.format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
                                                              cx_file_name))
 
-        return cx_file_path, network_name, 0
+        return cx_file_path, network_name, 0'''
 
 
     def _get_network_from_NDEx(self, network_UUID):
@@ -623,7 +623,7 @@ class NdexBioGRIDLoader(object):
         return network, 0
 
 
-    def _generate_CX_from_biogrid_organism_file(self, biogrid_file_path, organism_entry, template_network):
+    '''def _generate_CX_from_biogrid_organism_file(self, biogrid_file_path, organism_entry, template_network):
 
         tsv_file_path = self._generate_TSV_from_biogrid_organism_file(biogrid_file_path)
 
@@ -640,67 +640,61 @@ class NdexBioGRIDLoader(object):
         cx_file_path, network_name, status_code = \
             self._generate_CX_from_TSV(biogrid_file_path, tsv_file_path, template_network, organism_entry, 'chemical')
 
-        return cx_file_path, network_name, status_code
+        return cx_file_path, network_name, status_code'''
 
 
 
-    def _using_panda_generate_and_upload_CX(self, biogrid_file_path, organism_entry, template_network, template_uuid, type='organism'):
+    def _using_panda_generate_CX(self, biogrid_file_path, organism_entry, template_network, type='organism'):
 
         tsv_file_path = self._generate_TSV_from_biogrid_organism_file(biogrid_file_path) if type == 'organism' else \
             self._generate_TSV_from_biogrid_chemicals_file(biogrid_file_path)
+
+        cx_file_path, cx_file_name = self._get_CX_file_path_and_name(biogrid_file_path, organism_entry, type)
+        print('\n{} - started generating {}...'.format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")), cx_file_name))
 
         load_plan = self._organism_load_plan if type == 'organism' else self._chem_load_plan
 
         with open(load_plan, 'r') as lp:
             plan = json.load(lp)
 
-            dataframe = pd.read_csv(tsv_file_path,
-                                    dtype=str,
-                                    na_filter=False,
-                                    delimiter='\t',
-                                    engine='python')
 
-            network = t2n.convert_pandas_to_nice_cx_with_load_plan(dataframe, plan)
+        dataframe = pd.read_csv(tsv_file_path,
+                                dtype=str,
+                                na_filter=False,
+                                delimiter='\t',
+                                engine='python')
 
-            organism = organism_entry[1]
+        network = t2n.convert_pandas_to_nice_cx_with_load_plan(dataframe, plan)
 
-            if type == 'organism':
-                network_name = "BioGRID: Protein-Protein Interactions (" + organism_entry[2] + ")"
-                networkType = 'Protein-Protein Interaction'
-            else:
-                network_name = "BioGRID: Protein-Chemical Interactions (" + organism_entry[2] + ")"
-                networkType = 'Protein-Chemical Interaction'
+        organism = organism_entry[1]
 
-            network.set_name(network_name)
+        if type == 'organism':
+            network_name = "BioGRID: Protein-Protein Interactions (" + organism_entry[2] + ")"
+            networkType = 'Protein-Protein Interaction'
+        else:
+            network_name = "BioGRID: Protein-Chemical Interactions (" + organism_entry[2] + ")"
+            networkType = 'Protein-Chemical Interaction'
 
-            network.set_network_attribute("description",
-                                          template_network.get_network_attribute('description')['v'])
+        network.set_name(network_name)
 
-            network.set_network_attribute("reference",
-                                          template_network.get_network_attribute('reference')['v'])
-            network.set_network_attribute("version", self._biogrid_version)
-            network.set_network_attribute("organism", organism_entry[1])
-            network.set_network_attribute("networkType", networkType)
+        network.set_network_attribute("description",
+                                      template_network.get_network_attribute('description')['v'])
 
-            network.apply_template(username=self._user, password=self._pass, server=self._server,
-                                   uuid=template_uuid)
+        network.set_network_attribute("reference",
+                                      template_network.get_network_attribute('reference')['v'])
+        network.set_network_attribute("version", self._biogrid_version)
+        network.set_network_attribute("organism", organism_entry[1])
+        network.set_network_attribute("networkType", networkType)
 
-            network_UUID = self._network_summaries.get(network_name.upper())
+        network.apply_style_from_network(template_network)
 
-            if network_UUID is None:
-                print('\n{} - started uploading {}...'.format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-                                                              network_name))
-                network.upload_to(self._server, self._user, self._pass)
-                print('{} - finished uploading {}'.format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-                                                          network_name))
-            else:
-                print('\n{} - started updating {}...'.format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-                                                             network_name))
-                network.update_to(network_UUID, self._server, self._user, self._pass)
-                print('{} - finished updating {}'.format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-                                                         network_name))
+        with open(cx_file_path, 'w') as f:
+            json.dump(network.to_cx(), f, indent=4)
 
-        return 0
+        print('{} - finished generating {}'.format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),  cx_file_name))
+
+        return cx_file_path, network_name, 0
+
 
 
     def _upload_CX(self, path_to_network_in_CX, network_name):
@@ -746,7 +740,7 @@ class NdexBioGRIDLoader(object):
 
         self._download_biogrid_files()
 
-        #self._unzip_biogrid_files()
+
 
         return 0
 

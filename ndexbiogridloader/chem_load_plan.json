@@ -13,15 +13,17 @@
         "node_name_column": "Chemical Name",
         "property_columns":
            [
-
-               {
-                    "column_name": "Chemical Type",
-                    "attribute_name": "Chemical Type"
-                },
-
              {  "column_name": "Chemical Synonyms",
                 "attribute_name": "alias",
-                "delimiter" : "|" }
+                "delimiter" : "|" },
+             {
+                "attribute_name": "type",
+                "default_value": "chemical"
+             },
+             {
+                "column_name": "Chemical Type",
+                "attribute_name": "class"
+             }
            ]
     },
     "target_plan":
@@ -31,19 +33,19 @@
         "rep_prefix": "ncbigene",
         "property_columns":
            [
-               {
-                    "column_name": "TYPEB",
-                    "attribute_name": "TYPE"
-                },
              {  "column_name": "Synonyms",
                 "attribute_name": "alias",
                 "delimiter" : "|"
+             },
+            {
+                "attribute_name": "type",
+                "default_value": "protein"
              }
            ]
     },
     "edge_plan":
     {
-        "default_predicate": "acts on",
+        "default_predicate": "affects",
         "property_columns": [
                {
                     "column_name": "Action"

@@ -38,8 +38,9 @@ class TestNdexbiogridloader(unittest.TestCase):
             'biogridversion': '3.5.173',
             'datadir': self.__class__._biogrid_files_dir,
             'organismloadplan': ndexloadbiogrid.get_organism_load_plan(),
-            'chemicalloadplan': ndexloadbiogrid.get_chemical_load_plan()
-
+            'chemicalloadplan': ndexloadbiogrid.get_chemical_load_plan(),
+            'organismstyle': ndexloadbiogrid.get_organism_style(),
+            'chemicalstyle': ndexloadbiogrid.get_chemical_style()
         }
 
         self._the_args = dotdict(self._the_args)
@@ -66,10 +67,6 @@ class TestNdexbiogridloader(unittest.TestCase):
             ['BIOGRID-CHEMICALS', 'Human, 9606, Homo sapiens', 'H. sapiens']
         ]
 
-        self.__class__._style = {
-            'protein_uuid': '5b25420b-9120-11e9-95a1-525400c25d22',
-            'chem_uuid': '1243eb96-9121-11e9-95a1-525400c25d22'
-        }
 
         self.__class__._ndex = self.NdexBioGRIDLoader._create_ndex_connection()
         self.assertIsNotNone(self.__class__._ndex, 'Unable to to create NDEx client connection')
@@ -81,6 +78,11 @@ class TestNdexbiogridloader(unittest.TestCase):
         net_summaries, status_code = self.NdexBioGRIDLoader._load_network_summaries_for_user()
         self.assertEqual(status_code, 0, 'Unable to get netwok summaries')
 
+        self.__class__.NdexBioGRIDLoader._load_chemical_style_template()
+        self.__class__.NdexBioGRIDLoader._load_organism_style_template()
+
+        self.__class__._organism_template = self.__class__.NdexBioGRIDLoader.__getattribute__('_organism_style_template')
+        self.__class__._chemical_template = self.__class__.NdexBioGRIDLoader.__getattribute__('_chem_style_template')
 
 
     def setUp(self):
@@ -104,9 +106,6 @@ class TestNdexbiogridloader(unittest.TestCase):
 
     #@unittest.skip("skipping test_10")
     def test_10_using_panda_generate_organism_CX_and_upload(self):
-
-        protein_template, status_code = self.NdexBioGRIDLoader._get_network_from_NDEx(self.__class__._style['protein_uuid'])
-        self.assertEqual(status_code, 0, 'Unable to get protein style network UUID ' + self.__class__._style['protein_uuid'])
 
         expected_organism_header = [
             '#BioGRID Interaction ID',
@@ -149,10 +148,13 @@ class TestNdexbiogridloader(unittest.TestCase):
                 self.assertListEqual(expected_organism_header, header)
 
                 biogrid_organism_CX_path, network_name, status_code_1  = \
-                    self.NdexBioGRIDLoader._using_panda_generate_CX(biogrid_organism_file_path, entry, protein_template, 'organism')
+                    self.NdexBioGRIDLoader._using_panda_generate_nice_CX(biogrid_organism_file_path, entry,
+                                                                    self.__class__._organism_template, 'organism')
 
                 self.assertEqual(status_code_1, 0, 'Unable to generate CX from ' + biogrid_organism_file_path)
                 self.assertIsNotNone(biogrid_organism_CX_path, 'No path for CX file generated from ' + file_name)
+
+                #self.collapse_edges()
 
                 status_code1 = self.NdexBioGRIDLoader._upload_CX(biogrid_organism_CX_path, network_name)
                 self.assertEqual(status_code_1, 0, 'Unable to upload ' + network_name)
@@ -161,9 +163,6 @@ class TestNdexbiogridloader(unittest.TestCase):
 
     #@unittest.skip("skipping test_20")
     def test_20_using_panda_generate_chemical_CX_and_upload(self):
-
-        chemical_template, status_code = self.NdexBioGRIDLoader._get_network_from_NDEx(self.__class__._style['chem_uuid'])
-        self.assertEqual(status_code, 0, 'Unable to get chemicals style network UUID ' + self.__class__._style['chem_uuid'])
 
         expected_chemical_header = [
             '#BioGRID Chemical Interaction ID',
@@ -218,7 +217,8 @@ class TestNdexbiogridloader(unittest.TestCase):
                 self.assertListEqual(expected_chemical_header, header)
 
                 biogrid_chemical_CX_path, network_name, status_code_1  = \
-                    self.NdexBioGRIDLoader._using_panda_generate_CX(biogrid_chemicals_file_path, entry, chemical_template, 'chemical')
+                    self.NdexBioGRIDLoader._using_panda_generate_nice_CX(biogrid_chemicals_file_path, entry,
+                                                                    self.__class__._chemical_template, 'chemical')
 
                 self.assertEqual(status_code_1, 0, 'Unable to generate CX from ' + biogrid_chemicals_file_path)
                 self.assertIsNotNone(biogrid_chemical_CX_path, 'No path for CX file generated from ' + file_name)

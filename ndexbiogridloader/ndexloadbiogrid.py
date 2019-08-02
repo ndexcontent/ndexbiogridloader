@@ -162,6 +162,8 @@ def _parse_arguments(desc, args):
     help_fm = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=help_fm)
+    parser.add_argument('datadir', help='Directory where BioGRID data downloaded to and processed from')
+
     parser.add_argument('--profile', help='Profile in configuration '
                                           'file to use to load '
                                           'NDEx credentials which means'
@@ -194,9 +196,6 @@ def _parse_arguments(desc, args):
                                  ndexbiogridloader.__version__))
 
     parser.add_argument('--biogridversion', help='Version of BioGRID Release', default='3.5.173')
-
-    parser.add_argument('--datadir', help='Directory where BioGRID data downloaded to and processed from',
-                                          default=get_datadir())
 
     parser.add_argument('--skipdownload', action='store_true',
                         help='If set, skips download of data from BioGRID and assumes data already reside in <datadir>'
@@ -249,6 +248,7 @@ class NdexBioGRIDLoader(object):
         :param args:
         """
         self._args = args
+        self._datadir = os.path.abspath(args.datadir)
         self._conf_file = args.conf
         self._profile = args.profile
         self._organism_load_plan = args.organismloadplan
@@ -344,9 +344,8 @@ class NdexBioGRIDLoader(object):
 
     def _download_file(self, url, local_file):
 
-        if not os.path.exists(self._datadir):
-            os.makedirs(self._datadir)
-
+        #if not os.path.exists(self._datadir):
+        #    os.makedirs(self._datadir)
         try:
             response = requests.get(url)
             if response.status_code // 100 == 2:
@@ -662,7 +661,6 @@ class NdexBioGRIDLoader(object):
         return cx_file_path, network_name, 0'''
 
 
-
     '''def _get_network_from_NDEx(self, network_UUID):
         try:
             network = ndex2.create_nice_cx_from_server(server=self._server,
@@ -913,7 +911,7 @@ class NdexBioGRIDLoader(object):
 
         if not os.path.exists(self._datadir):
             data_dir_existed = False
-            os.makedirs(self._datadir)
+            os.makedirs(self._datadir, mode=0o755)
 
         return data_dir_existed
 

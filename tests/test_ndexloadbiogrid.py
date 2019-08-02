@@ -147,11 +147,10 @@ class TestNdexbiogridloader(unittest.TestCase):
                 self.assertEqual(status_code_1, 0, 'Unable to get header from ' + biogrid_organism_file_path)
                 self.assertListEqual(expected_organism_header, header)
 
-                biogrid_organism_CX_path, network_name, status_code_1  = \
+                biogrid_organism_CX_path, network_name   = \
                     self.NdexBioGRIDLoader._using_panda_generate_nice_CX(biogrid_organism_file_path, entry,
                                                                     self.__class__._organism_template, 'organism')
 
-                self.assertEqual(status_code_1, 0, 'Unable to generate CX from ' + biogrid_organism_file_path)
                 self.assertIsNotNone(biogrid_organism_CX_path, 'No path for CX file generated from ' + file_name)
 
                 #self.collapse_edges()
@@ -216,7 +215,7 @@ class TestNdexbiogridloader(unittest.TestCase):
                 self.assertEqual(status_code_1, 0, 'Unable to get header from ' + biogrid_chemicals_file_path)
                 self.assertListEqual(expected_chemical_header, header)
 
-                biogrid_chemical_CX_path, network_name, status_code_1  = \
+                biogrid_chemical_CX_path, network_name  = \
                     self.NdexBioGRIDLoader._using_panda_generate_nice_CX(biogrid_chemicals_file_path, entry,
                                                                     self.__class__._chemical_template, 'chemical')
 

@@ -35,7 +35,7 @@ class TestNdexbiogridloader(unittest.TestCase):
 
         self._the_args = {
             'profile': 'ndexbiogridloader',
-            'biogridversion': '3.5.173',
+            'biogridversion': '3.5.175',
             'datadir': self.__class__._biogrid_files_dir,
             'organismloadplan': ndexloadbiogrid.get_organism_load_plan(),
             'chemicalloadplan': ndexloadbiogrid.get_chemical_load_plan(),

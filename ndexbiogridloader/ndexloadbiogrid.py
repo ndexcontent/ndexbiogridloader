@@ -195,7 +195,7 @@ def _parse_arguments(desc, args):
                         version=('%(prog)s ' +
                                  ndexbiogridloader.__version__))
 
-    parser.add_argument('--biogridversion', help='Version of BioGRID Release', default='3.5.173')
+    parser.add_argument('--biogridversion', help='Version of BioGRID Release', default='3.5.175')
 
     parser.add_argument('--skipdownload', action='store_true',
                         help='If set, skips download of data from BioGRID and assumes data already reside in <datadir>'

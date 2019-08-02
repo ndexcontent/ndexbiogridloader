@@ -47,10 +47,13 @@ setup(
     name='ndexbiogridloader',
     packages=find_packages(include=['ndexbiogridloader']),
     scripts=[ 'ndexbiogridloader/ndexloadbiogrid.py'],
+    package_data={'ndexbiogridloader':
+      ['chem_load_plan.json', 'organism_load_plan.json', 'chemical_style.cx', 'organism_style.cx',
+       'chemicals_list.txt', 'organism_list.txt']},
     setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,
-    url='https://github.com/vrynkov/ndexbiogridloader',
+    url='https://github.com/ndexcontent/ndexbiogridloader',
     version=version,
     zip_safe=False,
 )

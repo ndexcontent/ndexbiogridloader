@@ -6,27 +6,29 @@ NDEx BioGRID Content Loader
 .. image:: https://img.shields.io/pypi/v/ndexbiogridloader.svg
         :target: https://pypi.python.org/pypi/ndexbiogridloader
 
-.. image:: https://img.shields.io/travis/vrynkov/ndexbiogridloader.svg
-        :target: https://travis-ci.org/vrynkov/ndexbiogridloader
+.. image:: https://img.shields.io/travis/ndexcontent/ndexbiogridloader.svg
+        :target: https://travis-ci.org/ndexcontent/ndexbiogridloader
+
+.. image:: https://coveralls.io/repos/github/ndexcontent/ndexbiogridloader/badge.svg?branch=master
+        :target: https://coveralls.io/github/ndexcontent/ndexbiogridloader?branch=master
 
 .. image:: https://readthedocs.org/projects/ndexbiogridloader/badge/?version=latest
         :target: https://ndexbiogridloader.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
 
+Python application for loading BioGRID data into `NDEx <http://ndexbio.org>`_.
+
+This tool downloads and unpacks the `BioGRID <https://thebiogrid.org/>`_ files below
+
+    `BIOGRID-ORGANISM-3.5.175.tab2.zip <https://downloads.thebiogrid.org/Download/BioGRID/Release-Archive/BIOGRID-3.5.175/BIOGRID-ORGANISM-3.5.175.tab2.zip>`_
+
+    `BIOGRID-CHEMICALS-3.5.175.chemtab.zip <https://downloads.thebiogrid.org/Download/BioGRID/Release-Archive/BIOGRID-3.5.175/BIOGRID-CHEMICALS-3.5.175.chemtab.zip>`_
 
 
-Python Boilerplate contains all the boilerplate you need to create a Python NDEx Content Loader package.
 
 
-* Free software: BSD license
-* Documentation: https://ndexbiogridloader.readthedocs.io.
 
-
-Tools
------
-
-* **ndexloadbiogrid.py** -- Loads BioGRID into NDEx_
 
 Dependencies
 ------------
@@ -44,13 +46,13 @@ Installation
 
 .. code-block::
 
-   git clone https://github.com/vrynkov/ndexbiogridloader
+   git clone https://github.com/ndexcontent/ndexbiogridloader
    cd ndexbiogridloader
    make dist
    pip install dist/ndexloadbiogrid*whl
 
 
-Run **make** command with no arguments to see other build/deploy options including creation of Docker image 
+Run **make** command with no arguments to see other build/deploy options including creation of Docker image
 
 .. code-block::
 
@@ -94,7 +96,6 @@ The default path for this configuration is :code:`~/.ndexutils.conf` but can be 
     user = <NDEx username>
     password = <NDEx password>
     server = <NDEx server(omit http) ie public.ndexbio.org>
-    style = <NDEx UUID of network to use for styling networks created>
 
 
 The NDEx UUID needed for **style** can be obtained by uploading the :code:`style.cx` file found under
@@ -102,16 +103,14 @@ the :code:`data/` directory of this repository. NOTE: The network needs to be up
 server as defined in **style** :code:`public.ndexbio.org` is NDEx_ production. Also the network needs
 to be visible to the **user**
 
-**Example configuration file**
+**Example of default configuration file**
 
 .. code-block::
 
-    [ndexbiogridloader_dev]
-
+    [ndexbiogridloader]
     user = joe123
     password = somepassword123
     server = dev.ndexbio.org
-    style = 86f63bf8-1b48-11e9-a05d-525400c25d22
 
 
 Needed files
@@ -125,13 +124,13 @@ Usage
 
 For information invoke :code:`ndexloadbiogrid.py -h`
 
-**Example usage**
-
-**TODO:** Add information about example usage
+The command shown below will download the default version of BioGRID files (3.5.175) to the working
+directory :code:`biogrid_data`, will generate CX networks in this directory, and then upload these networks
+to default account specified in :code:`[ndexbiogridloader]` section of default configuration file:
 
 .. code-block::
 
-   ndexloadbiogrid.py # TODO Add other needed arguments here
+   ndexloadbiogrid.py biogrid_data
 
 
 Via Docker
@@ -154,5 +153,4 @@ This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypack
 
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
 .. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
-.. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
-.. _NDEx: http://www.ndexbio.org
+

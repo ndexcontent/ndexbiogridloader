@@ -87,7 +87,7 @@ The **ndexloadbiogrid.py** requires a configuration file in the following format
 The default path for this configuration is :code:`~/.ndexutils.conf` but can be overridden with
 :code:`--conf` flag.
 
-**Format of configuration file**
+**Format of configuration file:**
 
 .. code-block::
 
@@ -97,13 +97,7 @@ The default path for this configuration is :code:`~/.ndexutils.conf` but can be 
     password = <NDEx password>
     server = <NDEx server(omit http) ie public.ndexbio.org>
 
-
-The NDEx UUID needed for **style** can be obtained by uploading the :code:`style.cx` file found under
-the :code:`data/` directory of this repository. NOTE: The network needs to be uploaded to the same
-server as defined in **style** :code:`public.ndexbio.org` is NDEx_ production. Also the network needs
-to be visible to the **user**
-
-**Example of default configuration file**
+**Example of default configuration file:**
 
 .. code-block::
 

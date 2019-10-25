@@ -50,22 +50,25 @@
         "property_columns": [
                {
                     "column_name": "Experimental System",
-                    "delimiter": "|"},
+                    "delimiter": "|"
+               },
                {
-                    "column_name": "Experimental System Type"
-                },
-                {
+                    "column_name": "Experimental System Type",
+                    "data_type": "list_of_string"
+               },
+               {
                     "column_name": "Pubmed ID",
                     "attribute_name": "citation",
                     "value_prefix": "pubmed",
                     "delimiter": "|"
-                },
+               },
                {
-                    "column_name": "Throughput"
+                    "column_name": "Throughput",
+                    "data_type": "list_of_string"
                 },
                {
                     "column_name": "Score",
-                    "data_type":  "double"
+                    "data_type": "list_of_double"
                 },
                {
                     "column_name": "Modification",

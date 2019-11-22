@@ -195,7 +195,7 @@ def _parse_arguments(desc, args):
                         version=('%(prog)s ' +
                                  ndexbiogridloader.__version__))
 
-    parser.add_argument('--biogridversion', help='Version of BioGRID Release', default='3.5.175')
+    parser.add_argument('--biogridversion', help='Version of BioGRID Release', default='3.5.178')
 
     parser.add_argument('--skipdownload', action='store_true',
                         help='If set, skips download of data from BioGRID and assumes data already reside in <datadir>'
@@ -613,86 +613,6 @@ class NdexBioGRIDLoader(object):
         return cx_file_name
 
 
-
-    '''def _generate_CX_from_TSV(self, file_path, tsv_file_path, template, organism_or_chemical_entry, type='organism'):
-
-        cx_file_path, cx_file_name = self._get_CX_file_path_and_name(file_path, organism_or_chemical_entry, type)
-
-        print('\n{} - started generating {}...'.format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")), cx_file_name))
-
-        with open(tsv_file_path, 'r') as tsvfile:
-
-            with open(cx_file_path, "w") as out:
-
-                load_plan = self._organism_load_plan if type == 'organism' else self._chem_load_plan
-                loader = StreamTSVLoader(load_plan, template)
-
-                if type == 'organism':
-                    network_name =  "BioGRID: Protein-Protein Interactions (" + organism_or_chemical_entry[2] + ")"
-                    networkType = 'Protein-Protein Interaction'
-                else:
-                    network_name =  "BioGRID: Protein-Chemical Interactions (" + organism_or_chemical_entry[2] + ")"
-                    networkType = 'Protein-Chemical Interaction'
-
-                organism = organism_or_chemical_entry[1]
-
-                try:
-                    loader.write_cx_network(tsvfile, out,
-                                            [
-                                                {'n': 'name', 'v': network_name},
-                                                {'n': 'description',
-                                                 'v': template.get_network_attribute('description')['v']},
-                                                {'n': 'reference',
-                                                 'v': template.get_network_attribute('reference')['v']},
-                                                {'n': 'version', 'v': self._biogrid_version},
-                                                {'n': 'organism', 'v': organism},
-                                                {'n': 'networkType', 'v': networkType}
-                                            ])
-                except Exception as e:
-
-                    print('{} - unable to generate {}: {}'.format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-                                                               cx_file_name, e))
-                    return None, network_name, 2
-
-                else:
-                    print('{} - finished generating {}'.format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-                                                             cx_file_name))
-
-        return cx_file_path, network_name, 0'''
-
-
-    '''def _get_network_from_NDEx(self, network_UUID):
-        try:
-            network = ndex2.create_nice_cx_from_server(server=self._server,
-                                                       uuid=network_UUID,
-                                                       username=self._user,
-                                                       password=self._pass)
-        except Exception as e:
-            return None, 2
-
-        return network, 0'''
-
-
-    '''def _generate_CX_from_biogrid_organism_file(self, biogrid_file_path, organism_entry, template_network):
-
-        tsv_file_path = self._generate_TSV_from_biogrid_organism_file(biogrid_file_path)
-
-        cx_file_path, network_name, status_code = \
-            self._generate_CX_from_TSV(biogrid_file_path, tsv_file_path, template_network, organism_entry, 'organism')
-
-        return cx_file_path, network_name, status_code
-
-
-    def _generate_CX_from_biogrid_chemicals_file(self, biogrid_file_path, organism_entry, template_network):
-
-        tsv_file_path = self._generate_TSV_from_biogrid_chemicals_file(biogrid_file_path)
-
-        cx_file_path, network_name, status_code = \
-            self._generate_CX_from_TSV(biogrid_file_path, tsv_file_path, template_network, organism_entry, 'chemical')
-
-        return cx_file_path, network_name, status_code'''
-
-
     def _merge_attributes(self, attribute_list_1, attribute_list_2):
 
         for attribute1 in attribute_list_1:
@@ -838,10 +758,10 @@ class NdexBioGRIDLoader(object):
 
         if type == 'organism':
             network_name = "BioGRID: Protein-Protein Interactions (" + organism_entry[2] + ")"
-            networkType = '["interactome", "ppi"]'
+            networkType = ['interactome', 'ppi']
         else:
             network_name = "BioGRID: Protein-Chemical Interactions (" + organism_entry[2] + ")"
-            networkType = '["proteinassociation", "compoundassociation"]'
+            networkType = ['proteinassociation', 'compoundassociation']
 
         network.set_name(network_name)
 
@@ -852,7 +772,7 @@ class NdexBioGRIDLoader(object):
                                       template_network.get_network_attribute('reference')['v'])
         network.set_network_attribute("version", self._biogrid_version)
         network.set_network_attribute("organism", organism_entry[1])
-        network.set_network_attribute("networkType", networkType)
+        network.set_network_attribute("networkType", networkType, 'list_of_string')
         network.set_network_attribute("__iconurl", "https://home.ndexbio.org/img/biogrid_logo.jpg")
 
         network.apply_style_from_network(template_network)

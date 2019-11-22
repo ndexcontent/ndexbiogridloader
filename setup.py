@@ -27,7 +27,7 @@ test_requirements = [ ]
 
 setup(
     author="Vladimir Rynkov",
-    author_email='vrynkov@ucsd.edu',
+    author_email='vrynkov@yahoo.edu',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',

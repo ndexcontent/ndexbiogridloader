@@ -2,6 +2,16 @@
 History
 =======
 
+0.2.0 (2020-07-27)
+------------------
+
+* Modified organism_list file to include 3 strains of
+  coronavirus (SARS-1, SARS-2 and MERS)
+
+* Modified organism_style file to add an orange border
+  to all viral protein nodes. This change affects all the
+  both new and already existing viral organisms.
+
 0.1.3 (2019-11-21)
 ------------------
 Fixed a bug where networkType used to be a string, now it is a list of strings and we specify 'list_of_string'

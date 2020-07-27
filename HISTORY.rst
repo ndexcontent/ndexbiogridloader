@@ -5,6 +5,8 @@ History
 0.2.0 (2020-07-27)
 ------------------
 
+* Updated default ``--biogridversion`` version to ``3.5.187``
+
 * Modified organism_list file to include 3 strains of
   coronavirus (SARS-1, SARS-2 and MERS)
 

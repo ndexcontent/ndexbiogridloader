@@ -19,7 +19,9 @@ with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
 requirements = ['ndex2>=3.1.0a1,<=4.0.0',
-                'ndexutil>=0.1.0a3,<=1.0.0']
+                'ndexutil>=0.1.0a3,<=1.0.0',
+                'requests',
+                'pandas']
 
 setup_requirements = [ ]
 

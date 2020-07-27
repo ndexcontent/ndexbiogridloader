@@ -26,6 +26,7 @@ class TestNdexbiogridloader(unittest.TestCase):
 
     """Tests for `ndexbiogridloader` package."""
 
+    """
     def setupClass(self):
         unittest.TestCase.setUp(self)
 
@@ -86,7 +87,6 @@ class TestNdexbiogridloader(unittest.TestCase):
 
 
     def setUp(self):
-        """Set up test fixtures, if any."""
         if not self.ClassIsSetup:
             self.setupClass()
             self.__class__.ClassIsSetup = True
@@ -97,14 +97,19 @@ class TestNdexbiogridloader(unittest.TestCase):
         self.chemicals_file_entries = self.NdexBioGRIDLoader._get_organism_or_chemicals_file_content('chemicals')
         self.assertListEqual(self.chemicals_entries_expected, self.chemicals_file_entries)
 
+    """
+
+    def setUp(self):
+        """setup"""
+        pass
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
+        pass
 
 
 
-
-    #@unittest.skip("skipping test_10")
+    @unittest.skip("skipping test_10")
     def test_10_using_panda_generate_organism_CX_and_upload(self):
 
         expected_organism_header = [
@@ -160,7 +165,7 @@ class TestNdexbiogridloader(unittest.TestCase):
 
 
 
-    #@unittest.skip("skipping test_20")
+    @unittest.skip("skipping test_20")
     def test_20_using_panda_generate_chemical_CX_and_upload(self):
 
         expected_chemical_header = [

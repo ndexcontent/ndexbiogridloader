@@ -108,11 +108,6 @@ The default path for this configuration is :code:`~/.ndexutils.conf` but can be 
     server = dev.ndexbio.org
 
 
-Needed files
-------------
-
-**TODO:** Add description of needed files
-
 
 Usage
 -----
@@ -128,17 +123,6 @@ to default account specified in :code:`[ndexbiogridloader]` section of default c
    ndexloadbiogrid.py biogrid_data
 
 
-Via Docker
-~~~~~~~~~~~~~~~~~~~~~~
-
-**Example usage**
-
-**TODO:** Add information about example usage
-
-
-.. code-block::
-
-   docker run -v `pwd`:`pwd` -w `pwd` vrynkov/ndexbiogridloader:0.1.0 ndexloadbiogrid.py --conf conf # TODO Add other needed arguments here
 
 
 Credits

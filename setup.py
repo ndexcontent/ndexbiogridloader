@@ -23,6 +23,7 @@ requirements = ['ndex2>=3.1.0a1,<=4.0.0',
                 'requests',
                 'pandas',
                 'networkx',
+                'scipy',
                 'tqdm']
 
 setup_requirements = [ ]

@@ -5,7 +5,6 @@ import sys
 import logging
 import time
 from logging import config
-from datetime import datetime
 from ndexutil.config import NDExUtilConfig
 import ndexbiogridloader
 import requests
@@ -29,6 +28,11 @@ LOG_FORMAT = "%(asctime)-15s %(levelname)s %(relativeCreated)dms " \
 import json
 import pandas as pd
 import ndexutil.tsv.tsv2nicecx2 as t2n
+
+
+class Formatter(argparse.ArgumentDefaultsHelpFormatter,
+                argparse.RawDescriptionHelpFormatter):
+    pass
 
 
 ORGANISM_STYLE = 'organism_style.cx'
@@ -141,9 +145,8 @@ def _parse_arguments(desc, args):
     :param args:
     :return:
     """
-    help_fm = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc,
-                                     formatter_class=help_fm)
+                                     formatter_class=Formatter)
     parser.add_argument('datadir', help='Directory where BioGRID data downloaded to and processed from')
 
     parser.add_argument('--profile', help='Profile in configuration '
@@ -177,8 +180,11 @@ def _parse_arguments(desc, args):
                         version=('%(prog)s ' +
                                  ndexbiogridloader.__version__))
     parser.add_argument('--biogridversion',
-                        help='Version of BioGRID Release',
-                        default='3.5.187')
+                        help='Version of BioGRID Release. To see what '
+                             'versions are available, visit: '
+                             'https://downloads.thebiogrid.org/'
+                             'BioGRID/Release-Archive/',
+                        default='4.2.191')
     parser.add_argument('--skipdownload', action='store_true',
                         help='If set, skips download of data from BioGRID and '
                              'assumes data already reside in <datadir>'
@@ -290,12 +296,8 @@ class NdexBioGRIDLoader(object):
 
         self._biogrid_organism_file_ext = '-' + self._biogrid_version  + '.tab2.txt'
         self._biogrid_chemicals_file_ext = '-' + self._biogrid_version + '.chemtab.txt'
-
         self._skipdownload = args.skipdownload
-
         self._network = None
-
-        #self._organism_file
 
     def _load_chemical_style_template(self):
         """
@@ -485,6 +487,8 @@ class NdexBioGRIDLoader(object):
         try:
             network_summaries = self._ndex.get_network_summaries_for_user(self._user)
         except Exception as e:
+            logger.error('Got error trying to get list of'
+                         'networks for user: ' + str(e))
             return None, 2
 
         for summary in network_summaries:

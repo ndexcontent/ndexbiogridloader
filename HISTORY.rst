@@ -2,7 +2,7 @@
 History
 =======
 
-0.3.0 (TBD)
+0.3.0 (10-27-2020)
 ------------------
 
 * All generated networks get networkx spring layout added by default

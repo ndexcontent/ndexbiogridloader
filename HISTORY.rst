@@ -5,6 +5,8 @@ History
 0.3.0 (10-27-2020)
 ------------------
 
+* Updated default ``--biogridversion`` version to ``4.2.191``
+
 * All generated networks get networkx spring layout added by default
 
 * Added tqdm progress bar support. Set ``--noprogressbar`` flag to disable
@@ -17,9 +19,6 @@ History
 
 * Added ``--organismfile`` and ``--chemicalsfile`` to let caller override
   defaults
-
-
-
 
 0.2.0 (2020-07-27)
 ------------------

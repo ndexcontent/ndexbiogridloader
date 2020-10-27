@@ -142,11 +142,104 @@ class TestNdexbiogridloader(unittest.TestCase):
                                                       maxretries=1,
                                                       retry_sleep=0)
             self.assertEqual(0, res)
+        finally:
+            shutil.rmtree(temp_dir)
 
+    def test_apply_simple_spring_layout(self):
+        net = NiceCXNetwork()
+        n_one = net.create_node('node1')
+        n_two = net.create_node('node2')
+        net.create_edge(n_one, n_two, 'links')
+        p = MagicMock()
+        p.datadir = 'datadir'
+        p.profile = 'foo'
+        p.organismloadplan = ndexloadbiogrid.get_organism_load_plan()
+        p.chemicalloadplan = ndexloadbiogrid.get_chemical_load_plan()
+        p.organismstyle = ndexloadbiogrid.get_organism_style()
+        p.chemstyle = ndexloadbiogrid.get_chemical_style()
+        p.biogridversion = '1.0.0'
+        p.skipdownload = False
+        loader = NdexBioGRIDLoader(p)
+        loader._apply_simple_spring_layout(net)
 
+        aspect = net.get_opaque_aspect('cartesianLayout')
+        self.assertEqual(2, len(aspect))
+
+        # try with 19 nodes
+        net = NiceCXNetwork()
+        for x in range(0, 19):
+            net.create_node(str(x))
+        loader._apply_simple_spring_layout(net)
+
+        aspect = net.get_opaque_aspect('cartesianLayout')
+        self.assertEqual(19, len(aspect))
+
+        # try with 99 nodes
+        net = NiceCXNetwork()
+        for x in range(0, 99):
+            net.create_node(str(x))
+        loader._apply_simple_spring_layout(net)
+
+        aspect = net.get_opaque_aspect('cartesianLayout')
+        self.assertEqual(99, len(aspect))
+
+        # try with 101 nodes
+        net = NiceCXNetwork()
+        for x in range(0, 101):
+            net.create_node(str(x))
+        loader._apply_simple_spring_layout(net)
+
+        aspect = net.get_opaque_aspect('cartesianLayout')
+        self.assertEqual(101, len(aspect))
+
+    def test_check_if_data_dir_exists(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            p = MagicMock()
+            p.datadir = temp_dir
+            p.profile = 'foo'
+            p.organismloadplan = ndexloadbiogrid.get_organism_load_plan()
+            p.chemicalloadplan = ndexloadbiogrid.get_chemical_load_plan()
+            p.organismstyle = ndexloadbiogrid.get_organism_style()
+            p.chemstyle = ndexloadbiogrid.get_chemical_style()
+            p.biogridversion = '1.0.0'
+            p.skipdownload = False
+            loader = NdexBioGRIDLoader(p)
+            self.assertTrue(loader._check_if_data_dir_exists())
+
+            p.datadir = os.path.join(temp_dir, 'foo')
+            loader = NdexBioGRIDLoader(p)
+            self.assertFalse(loader._check_if_data_dir_exists())
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_write_nice_cx_to_file(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            p = MagicMock()
+            p.datadir = temp_dir
+            p.profile = 'foo'
+            p.organismloadplan = ndexloadbiogrid.get_organism_load_plan()
+            p.chemicalloadplan = ndexloadbiogrid.get_chemical_load_plan()
+            p.organismstyle = ndexloadbiogrid.get_organism_style()
+            p.chemstyle = ndexloadbiogrid.get_chemical_style()
+            p.biogridversion = '1.0.0'
+            p.skipdownload = False
+            loader = NdexBioGRIDLoader(p)
+            loader._network = NiceCXNetwork()
+            loader._network.create_node('hi')
+            loader._network.set_name('name')
+            cxfile = os.path.join(temp_dir, 'some.cx')
+            loader._write_nice_cx_to_file(cxfile)
+
+            self.assertTrue(os.path.isfile(cxfile))
+
+            checknet = ndex2.create_nice_cx_from_file(cxfile)
+            self.assertEqual('name', checknet.get_name())
 
         finally:
             shutil.rmtree(temp_dir)
+
 
     @unittest.skip("skipping test_10")
     def test_10_using_panda_generate_organism_CX_and_upload(self):

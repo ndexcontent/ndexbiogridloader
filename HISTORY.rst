@@ -2,6 +2,25 @@
 History
 =======
 
+0.3.0 (TBD)
+------------------
+
+* All generated networks get networkx spring layout added by default
+
+* Added tqdm progress bar support. Set ``--noprogressbar`` flag to disable
+
+* Added --skipupload flag to skip the upload to NDEx step
+
+* Added logic to retry failed upload of network to NDEx.
+  ``--maxretries`` and ``--retry_sleep`` allow caller to control
+  behavior
+
+* Added ``--organismfile`` and ``--chemicalsfile`` to let caller override
+  defaults
+
+
+
+
 0.2.0 (2020-07-27)
 ------------------
 

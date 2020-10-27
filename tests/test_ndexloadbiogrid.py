@@ -7,97 +7,17 @@ import os
 import tempfile
 import shutil
 
+from unittest.mock import MagicMock
 import unittest
+import ndex2
+from ndex2.nice_cx_network import NiceCXNetwork
 from ndexutil.config import NDExUtilConfig
 from ndexbiogridloader import ndexloadbiogrid
-
 from ndexbiogridloader.ndexloadbiogrid import NdexBioGRIDLoader
 
 
-class dotdict(dict):
-    """dot.notation access to dictionary attributes"""
-    __getattr__ = dict.get
-    __setattr__ = dict.__setitem__
-    __delattr__ = dict.__delitem__
-
-
 class TestNdexbiogridloader(unittest.TestCase):
-    ClassIsSetup = False
-
     """Tests for `ndexbiogridloader` package."""
-
-    """
-    def setupClass(self):
-        unittest.TestCase.setUp(self)
-
-        self.__class__._data_dir = ndexloadbiogrid.get_datadir()
-        self.__class__._testing_dir = ndexloadbiogrid.get_testsdir()
-        self.__class__._biogrid_files_dir = os.path.join(self.__class__._testing_dir, 'biogrid_files')
-
-        self._the_args = {
-            'profile': 'ndexbiogridloader',
-            'biogridversion': '3.5.175',
-            'datadir': self.__class__._biogrid_files_dir,
-            'organismloadplan': ndexloadbiogrid.get_organism_load_plan(),
-            'chemicalloadplan': ndexloadbiogrid.get_chemical_load_plan(),
-            'organismstyle': ndexloadbiogrid.get_organism_style(),
-            'chemicalstyle': ndexloadbiogrid.get_chemical_style()
-        }
-
-        self._the_args = dotdict(self._the_args)
-        self.__class__.NdexBioGRIDLoader = NdexBioGRIDLoader(self._the_args)
-        self.__class__.NdexBioGRIDLoader._parse_config()
-
-        self.__class__.organism_entries_expected = [
-            ['BIOGRID-ORGANISM-Zea_mays', 'Maize, 4577, Zea mays', 'Z. mays'],
-            ['BIOGRID-ORGANISM-Xenopus_laevis', 'African clawed frog, 8355, Xenopus laevis', 'X. laevis'],
-            ['BIOGRID-ORGANISM-Saccharomyces_cerevisiae_S288c', 'Baker\'s yeast, 559292', 'S. cerevisiae'],
-            ['BIOGRID-ORGANISM-Rattus_norvegicus', 'Norway rat, 10116, Rattus norvegicus',  'R. norvegicus'],
-            ['BIOGRID-ORGANISM-Mus_musculus', 'House mouse, 10090, Mus musculus', 'M. musculus'],
-            ['BIOGRID-ORGANISM-Human_papillomavirus_16', 'HPV, 10566, Human papillomavirus', 'HPV'],
-            ['BIOGRID-ORGANISM-Human_Immunodeficiency_Virus_2', 'HIV-2, 11709, Human immunodeficiency virus 2', 'HIV-2'],
-            ['BIOGRID-ORGANISM-Human_Immunodeficiency_Virus_1', 'HIV-1, 11676, Human immunodeficiency virus 1', 'HIV-1'],
-            ['BIOGRID-ORGANISM-Homo_sapiens', 'Human, 9606, Homo sapiens', 'H. sapiens'],
-            ['BIOGRID-ORGANISM-Drosophila_melanogaster', 'Fruit fly, 7227, Drosophila melanogaster', 'D. melanogaster'],
-            ['BIOGRID-ORGANISM-Danio_rerio',  'Zebrafish, 7955, Danio rerio',  'D. rerio'],
-            ['BIOGRID-ORGANISM-Caenorhabditis_elegans', 'Roundworm, 6239, Cenorhabditis elegans', 'C. elegans'],
-            ['BIOGRID-ORGANISM-Arabidopsis_thaliana_Columbia', 'Thale cress, 3702, Arabidopsis thaliana', 'A. thaliana']
-        ]
-
-        self.__class__.chemicals_entries_expected = [
-            ['BIOGRID-CHEMICALS', 'Human, 9606, Homo sapiens', 'H. sapiens']
-        ]
-
-
-        self.__class__._ndex = self.NdexBioGRIDLoader._create_ndex_connection()
-        self.assertIsNotNone(self.__class__._ndex, 'Unable to to create NDEx client connection')
-
-
-        status_code = self.NdexBioGRIDLoader._download_biogrid_files()
-        self.assertEqual(status_code, 0, 'Unable to download required biogrid files ')
-
-        net_summaries, status_code = self.NdexBioGRIDLoader._load_network_summaries_for_user()
-        self.assertEqual(status_code, 0, 'Unable to get netwok summaries')
-
-        self.__class__.NdexBioGRIDLoader._load_chemical_style_template()
-        self.__class__.NdexBioGRIDLoader._load_organism_style_template()
-
-        self.__class__._organism_template = self.__class__.NdexBioGRIDLoader.__getattribute__('_organism_style_template')
-        self.__class__._chemical_template = self.__class__.NdexBioGRIDLoader.__getattribute__('_chem_style_template')
-
-
-    def setUp(self):
-        if not self.ClassIsSetup:
-            self.setupClass()
-            self.__class__.ClassIsSetup = True
-
-        self.organism_file_entries = self.NdexBioGRIDLoader._get_organism_or_chemicals_file_content()
-        self.assertListEqual(self.organism_entries_expected, self.organism_file_entries)
-
-        self.chemicals_file_entries = self.NdexBioGRIDLoader._get_organism_or_chemicals_file_content('chemicals')
-        self.assertListEqual(self.chemicals_entries_expected, self.chemicals_file_entries)
-
-    """
 
     def setUp(self):
         """setup"""
@@ -107,7 +27,126 @@ class TestNdexbiogridloader(unittest.TestCase):
         """Tear down test fixtures, if any."""
         pass
 
+    def test_get_package_dir(self):
+        res = ndexloadbiogrid.get_package_dir()
+        self.assertTrue(os.path.isdir(res))
 
+    def test_get_organism_style(self):
+        res = ndexloadbiogrid.get_organism_style()
+        self.assertTrue(os.path.isfile(res))
+        net = ndex2.create_nice_cx_from_file(res)
+        props = net.get_opaque_aspect('cyVisualProperties')
+        self.assertTrue(isinstance(props, list))
+
+    def test_get_chemical_style(self):
+        res = ndexloadbiogrid.get_chemical_style()
+        self.assertTrue(os.path.isfile(res))
+        net = ndex2.create_nice_cx_from_file(res)
+        props = net.get_opaque_aspect('cyVisualProperties')
+        self.assertTrue(isinstance(props, list))
+
+    def test_get_organism_load_plan(self):
+        res = ndexloadbiogrid.get_organism_load_plan()
+        self.assertTrue(os.path.isfile(res))
+
+    def test_get_chemical_load_plan(self):
+        res = ndexloadbiogrid.get_chemical_load_plan()
+        self.assertTrue(os.path.isfile(res))
+
+    def test_get_organismfile(self):
+        res = ndexloadbiogrid.get_organismfile()
+        self.assertTrue(os.path.isfile(res))
+
+    def test_get_chemicalsfile(self):
+        res = ndexloadbiogrid.get_chemicalsfile()
+        self.assertTrue(os.path.isfile(res))
+
+    def test_parse_arguments_defaults(self):
+        fakeargs = ['datadir']
+        pargs = ndexloadbiogrid._parse_arguments('desc', fakeargs)
+        self.assertEqual('datadir', pargs.datadir)
+        self.assertEqual('ndexbiogridloader', pargs.profile)
+        self.assertEqual('3.5.187', pargs.biogridversion)
+        self.assertEqual(ndexloadbiogrid.get_organism_load_plan(),
+                         pargs.organismloadplan)
+        self.assertEqual(ndexloadbiogrid.get_chemical_load_plan(),
+                         pargs.chemicalloadplan)
+        self.assertEqual(ndexloadbiogrid.get_organism_style(),
+                         pargs.organismstyle)
+        self.assertEqual(ndexloadbiogrid.get_chemical_style(),
+                         pargs.chemicalstyle)
+
+    def test_parse_arguments_custom(self):
+        fakeargs = ['datadir', '--biogridversion', '1',
+                    '--organismloadplan', 'organismplan',
+                    '--chemicalloadplan', 'chemicalplan',
+                    '--organismstyle', 'organismstyle',
+                    '--chemicalstyle', 'chemicalstyle']
+        pargs = ndexloadbiogrid._parse_arguments('desc', fakeargs)
+        self.assertEqual('datadir', pargs.datadir)
+        self.assertEqual('ndexbiogridloader', pargs.profile)
+        self.assertEqual('1', pargs.biogridversion)
+        self.assertEqual('organismplan',
+                         pargs.organismloadplan)
+        self.assertEqual('chemicalplan',
+                         pargs.chemicalloadplan)
+        self.assertEqual('organismstyle',
+                         pargs.organismstyle)
+        self.assertEqual('chemicalstyle',
+                         pargs.chemicalstyle)
+
+    def test_cvtfield(self):
+        self.assertEqual('xfoo', ndexloadbiogrid._cvtfield('xfoo'))
+        self.assertEqual('x', ndexloadbiogrid._cvtfield('x'))
+        self.assertEqual('', ndexloadbiogrid._cvtfield('-'))
+
+    def test_update_or_upload_with_retry(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            p = MagicMock()
+            p.datadir = os.path.join(temp_dir, 'datadir')
+            p.profile = 'foo'
+            p.organismloadplan = ndexloadbiogrid.get_organism_load_plan()
+            p.chemicalloadplan = ndexloadbiogrid.get_chemical_load_plan()
+            p.organismstyle = ndexloadbiogrid.get_organism_style()
+            p.chemstyle = ndexloadbiogrid.get_chemical_style()
+            p.biogridversion = '1.0.0'
+            p.skipdownload = False
+            loader = NdexBioGRIDLoader(p)
+            loader._ndex = MagicMock()
+            cxfile = os.path.join(temp_dir, 'file.cx')
+            with open(cxfile, 'wb') as f:
+                f.write(b'hello')
+            loader._ndex.save_cx_stream_as_new_network = MagicMock(side_effect=Exception('error'))
+
+            res = loader._update_or_upload_with_retry(cxfile=cxfile,
+                                                      network_name='foo',
+                                                      network_uuid=None,
+                                                      maxretries=1,
+                                                      retry_sleep=0)
+            self.assertEqual(2, res)
+
+            loader._ndex.update_cx_network = MagicMock(side_effect=Exception('error'))
+
+            res = loader._update_or_upload_with_retry(cxfile=cxfile,
+                                                      network_name='foo',
+                                                      network_uuid='1234',
+                                                      maxretries=1,
+                                                      retry_sleep=0)
+            self.assertEqual(2, res)
+
+            loader._ndex.save_cx_stream_as_new_network = MagicMock(return_value={})
+
+            res = loader._update_or_upload_with_retry(cxfile=cxfile,
+                                                      network_name='foo',
+                                                      maxretries=1,
+                                                      retry_sleep=0)
+            self.assertEqual(0, res)
+
+
+
+        finally:
+            shutil.rmtree(temp_dir)
 
     @unittest.skip("skipping test_10")
     def test_10_using_panda_generate_organism_CX_and_upload(self):
@@ -153,14 +192,14 @@ class TestNdexbiogridloader(unittest.TestCase):
                 self.assertListEqual(expected_organism_header, header)
 
                 biogrid_organism_CX_path, network_name   = \
-                    self.NdexBioGRIDLoader._using_panda_generate_nice_CX(biogrid_organism_file_path, entry,
-                                                                    self.__class__._organism_template, 'organism')
+                    self.NdexBioGRIDLoader._using_panda_generate_nice_cx(biogrid_organism_file_path, entry,
+                                                                         self.__class__._organism_template, 'organism')
 
                 self.assertIsNotNone(biogrid_organism_CX_path, 'No path for CX file generated from ' + file_name)
 
                 #self.collapse_edges()
 
-                status_code1 = self.NdexBioGRIDLoader._upload_CX(biogrid_organism_CX_path, network_name)
+                status_code1 = self.NdexBioGRIDLoader._upload_cx(biogrid_organism_CX_path, network_name)
                 self.assertEqual(status_code_1, 0, 'Unable to upload ' + network_name)
 
 
@@ -221,13 +260,13 @@ class TestNdexbiogridloader(unittest.TestCase):
                 self.assertListEqual(expected_chemical_header, header)
 
                 biogrid_chemical_CX_path, network_name  = \
-                    self.NdexBioGRIDLoader._using_panda_generate_nice_CX(biogrid_chemicals_file_path, entry,
-                                                                    self.__class__._chemical_template, 'chemical')
+                    self.NdexBioGRIDLoader._using_panda_generate_nice_cx(biogrid_chemicals_file_path, entry,
+                                                                         self.__class__._chemical_template, 'chemical')
 
                 self.assertEqual(status_code_1, 0, 'Unable to generate CX from ' + biogrid_chemicals_file_path)
                 self.assertIsNotNone(biogrid_chemical_CX_path, 'No path for CX file generated from ' + file_name)
 
-                status_code1 = self.NdexBioGRIDLoader._upload_CX(biogrid_chemical_CX_path, network_name)
+                status_code1 = self.NdexBioGRIDLoader._upload_cx(biogrid_chemical_CX_path, network_name)
                 self.assertEqual(status_code_1, 0, 'Unable to upload ' + network_name)
 
 
@@ -300,7 +339,7 @@ class TestNdexbiogridloader(unittest.TestCase):
                 self.assertEqual(status_code_1, 0, 'Unable to generate CX from ' + biogrid_organism_file_path)
 
 
-                status_code1 = self.NdexBioGRIDLoader._upload_CX(biogrid_organism_CX_path, network_name)
+                status_code1 = self.NdexBioGRIDLoader._upload_cx(biogrid_organism_CX_path, network_name)
                 self.assertEqual(status_code_1, 0, 'Unable to upload ' + network_name)
 
 

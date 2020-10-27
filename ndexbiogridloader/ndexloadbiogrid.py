@@ -3,23 +3,22 @@
 import argparse
 import sys
 import logging
+import time
 from logging import config
+from datetime import datetime
 from ndexutil.config import NDExUtilConfig
 import ndexbiogridloader
-
 import requests
 import os
 import zipfile
-
-import urllib3, shutil
 import ndex2
 from ndex2.client import Ndex2
+import networkx as nx
+from tqdm import tqdm
 
-from ndexutil.tsv.streamtsvloader import StreamTSVLoader
 
 logger = logging.getLogger(__name__)
 
-from datetime import datetime
 
 TSV2NICECXMODULE = 'ndexutil.tsv.tsv2nicecx2'
 
@@ -69,6 +68,7 @@ CHEM_LOAD_PLAN = 'chem_load_plan.json'
 Name of file containing json load plan
 for biogrid protein-chemical interactions
 """
+
 
 def get_package_dir():
     """
@@ -133,24 +133,6 @@ def get_chemicalsfile():
     """
     return os.path.join(get_package_dir(), CHEMICALSLISTFILE)
 
-def get_testsdir():
-    """
-    Constructs the testing directory path
-    :return: path to testing dir
-    :rtype: string
-    """
-    _parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-
-    return os.path.join(_parent_dir, TESTSDIR)
-
-def get_datadir():
-    """
-    Gets the directory where BioGRID archived files will be downloaded to and processed
-    :return: path to dir
-    :rtype: string
-    """
-    return os.path.join(get_package_dir(), DATADIR)
-
 
 def _parse_arguments(desc, args):
     """
@@ -194,22 +176,45 @@ def _parse_arguments(desc, args):
     parser.add_argument('--version', action='version',
                         version=('%(prog)s ' +
                                  ndexbiogridloader.__version__))
-
     parser.add_argument('--biogridversion',
                         help='Version of BioGRID Release',
                         default='3.5.187')
-
     parser.add_argument('--skipdownload', action='store_true',
-                        help='If set, skips download of data from BioGRID and assumes data already reside in <datadir>'
+                        help='If set, skips download of data from BioGRID and '
+                             'assumes data already reside in <datadir>'
                              'directory')
-
-    parser.add_argument('--organismloadplan', help='Use alternate organism load plan file', default=get_organism_load_plan())
-
-    parser.add_argument('--chemicalloadplan', help='Use alternate chemical load plan file', default=get_chemical_load_plan())
-
-    parser.add_argument('--organismstyle', help='Use alternate organism style file', default=get_organism_style())
-
-    parser.add_argument('--chemicalstyle', help='Use alternate chemical style file', default=get_chemical_style())
+    parser.add_argument('--skipupload', action='store_true',
+                        help='If set, upload of networks to NDEx is skipped.'
+                             'This is mainly for testing purposes')
+    parser.add_argument('--organismloadplan',
+                        help='Use alternate organism load plan file',
+                        default=get_organism_load_plan())
+    parser.add_argument('--organismfile', default=get_organismfile(),
+                        help='File containing list of organisms to '
+                             'upload to NDEx. By default the list '
+                             'stored with this tool is used')
+    parser.add_argument('--chemicalloadplan',
+                        help='Use alternate chemical load plan file',
+                        default=get_chemical_load_plan())
+    parser.add_argument('--chemicalsfile', default=get_chemicalsfile(),
+                        help='File containing list of chemicals to '
+                             'upload to NDEx. By default the list '
+                             'stored with this tool is used')
+    parser.add_argument('--organismstyle',
+                        help='Use alternate organism style file',
+                        default=get_organism_style())
+    parser.add_argument('--chemicalstyle',
+                        help='Use alternate chemical style file',
+                        default=get_chemical_style())
+    parser.add_argument('--noprogressbar', action='store_true',
+                        help='If set, disabled tqdm progress'
+                             'bar from displaying')
+    parser.add_argument('--maxretries', type=int, default=5,
+                        help='Number of retries to attempt to upload'
+                             'each of network to NDEx')
+    parser.add_argument('--retry_sleep', type=int, default=30,
+                        help='Number of seconds to wait between '
+                             'retry of failed upload of network to NDEx')
 
     return parser.parse_args(args)
 
@@ -237,8 +242,19 @@ def _setup_logging(args):
     logging.config.fileConfig(args.logconf,
                               disable_existing_loggers=False)
 
+
 def _cvtfield(f):
-    return '' if f == '-' else f
+    """
+    If str passed in via 'f' parameter is '-' then
+    return empty string otherwise return value of 'f'
+    :param f:
+    :return: empty string if 'f' is '-' otherwise return 'f'
+    :rtype: str
+    """
+    if f is None or f != '-':
+        return f
+    return ''
+
 
 class NdexBioGRIDLoader(object):
     """
@@ -281,7 +297,6 @@ class NdexBioGRIDLoader(object):
 
         #self._organism_file
 
-
     def _load_chemical_style_template(self):
         """
         Loads the CX network specified by self._chem_style into self._chem_style_template
@@ -289,14 +304,12 @@ class NdexBioGRIDLoader(object):
         """
         self._chem_style_template = ndex2.create_nice_cx_from_file(os.path.abspath(self._chem_style))
 
-
     def _load_organism_style_template(self):
         """
         Loads the CX network specified by self._organism_style into self._organism_style_template
         :return:
         """
         self._organism_style_template = ndex2.create_nice_cx_from_file(os.path.abspath(self._organism_style))
-
 
     def _get_biogrid_organism_file_name(self, file_extension):
         return 'BIOGRID-ORGANISM-' + self._biogrid_version + file_extension
@@ -327,13 +340,11 @@ class NdexBioGRIDLoader(object):
         self._pass = con.get(self._profile, NDExUtilConfig.PASSWORD)
         self._server = con.get(self._profile, NDExUtilConfig.SERVER)
 
-
     def _get_biogrid_file_name(self, organism_entry):
         return organism_entry[0] + self._biogrid_organism_file_ext
 
     def _get_biogrid_chemicals_file_name(self, chemical_entry):
         return chemical_entry[0] + self._biogrid_chemicals_file_ext
-
 
     def _get_header(self, file_path):
 
@@ -343,11 +354,7 @@ class NdexBioGRIDLoader(object):
 
         return header_line_split, 0
 
-
     def _download_file(self, url, local_file):
-
-        #if not os.path.exists(self._datadir):
-        #    os.makedirs(self._datadir)
         try:
             response = requests.get(url)
             if response.status_code // 100 == 2:
@@ -357,12 +364,10 @@ class NdexBioGRIDLoader(object):
                 return response.status_code
 
         except requests.exceptions.RequestException as e:
-            logger.exception('Caught exception')
-            print('\n\n\tException: {}\n'.format(e))
+            logger.exception('Caught exception: ' + str(e))
             return 2
 
         return 0
-
 
     def _download_biogrid_files(self):
         biogrid_organism_url = self._build_organism_file_url()
@@ -374,26 +379,17 @@ class NdexBioGRIDLoader(object):
 
         return self._download_file(biogrid_chemicals_url, self._chemicals_file_name)
 
-
     def _get_organism_or_chemicals_file_content(self, type='organism'):
         file_names = []
 
-        path_to_file = get_organismfile() if type == 'organism' else get_chemicalsfile()
+        path_to_file = self._args.organismfile if type == 'organism' else self._args.chemicalsfile
 
         with open(path_to_file, 'r') as f:
             for cnt, line in enumerate(f):
                 line_split = line.strip().split('\t')
                 line_split[1] = line_split[1].replace('"', '')
-                #line_split[0] = line_split[0] + '-' + self._biogrid_version + '.tab2.txt'
-
-                #file_name = (line.split('\t'))[0]
-                #organism_file_name = file_name.strip() + '-' + self._biogrid_version + '.tab2.txt'
                 file_names.append(line_split)
-
-        #file_names.reverse()
         return file_names
-
-
 
     def _unzip_biogrid_file(self, file_name, type='organism'):
         try:
@@ -405,23 +401,23 @@ class NdexBioGRIDLoader(object):
                     extracted_file_path = zip_ref.extract(file_name, self._datadir)
 
         except Exception as e:
-            print('\n\n\tException: {}\n'.format(e))
+            logger.exception('Caught exception: ' + str(e))
             return 2, None
 
         return 0, extracted_file_path
-
-
 
     def _remove_biogrid_organism_file(self, file_name):
         try:
             os.remove(file_name)
         except OSError as e:
+            logger.error('Caught error removing file: ' +
+                         file_name + ' : ' + str(e))
             return e.errno
 
         return 0
 
     def _get_header_for_generating_organism_tsv(self):
-        header =  [
+        header = [
             'Entrez Gene Interactor A',
             'Entrez Gene Interactor B',
             'Official Symbol Interactor A',
@@ -442,7 +438,7 @@ class NdexBioGRIDLoader(object):
         return header
 
     def _get_header_for_generating_chemicals_tsv(self):
-        header =  [
+        header = [
             'Entrez Gene ID',
             'Official Symbol',
             'Synonyms',
@@ -462,7 +458,6 @@ class NdexBioGRIDLoader(object):
         """
         return 'biogrid/' + self._biogrid_version
 
-
     def _create_ndex_connection(self):
         """
         creates connection to ndex
@@ -472,12 +467,12 @@ class NdexBioGRIDLoader(object):
 
             try:
                 self._ndex = Ndex2(host=self._server, username=self._user,
-                                   password=self._pass, user_agent=self._get_user_agent())
+                                   password=self._pass,
+                                   user_agent=self._get_user_agent())
             except Exception as e:
                 self._ndex = None
 
         return self._ndex
-
 
     def _load_network_summaries_for_user(self):
         """
@@ -498,8 +493,7 @@ class NdexBioGRIDLoader(object):
 
         return self._network_summaries, 0
 
-
-    def _generate_TSV_from_biogrid_organism_file(self, file_path):
+    def _generate_tsv_from_biogrid_organism_file(self, file_path):
 
         tsv_file_path = file_path.replace('.tab2.txt', '.tsv')
 
@@ -514,7 +508,7 @@ class NdexBioGRIDLoader(object):
 
                 split_line = line.split('\t')
 
-                key = split_line[1] + ","  + split_line[2] + "," + split_line[11] + "," + split_line[12] + "," + \
+                key = split_line[1] + "," + split_line[2] + "," + split_line[11] + "," + split_line[12] + "," + \
                       split_line[17] + "," + split_line[18] + "," + split_line[19] + "," + split_line[20] + "," + \
                       split_line[21]
 
@@ -543,8 +537,7 @@ class NdexBioGRIDLoader(object):
 
         return tsv_file_path
 
-
-    def _generate_TSV_from_biogrid_chemicals_file(self, file_path):
+    def _generate_tsv_from_biogrid_chemicals_file(self, file_path):
 
         tsv_file_path = file_path.replace('.chemtab.txt', '.tsv')
 
@@ -560,7 +553,7 @@ class NdexBioGRIDLoader(object):
 
                 split_line = line.split('\t')
 
-                if (split_line[6] != '9606'):
+                if split_line[6] != '9606':
                     continue
 
                 # add line to hash table
@@ -586,7 +579,6 @@ class NdexBioGRIDLoader(object):
 
                     result[key] = entry
 
-
             with open(tsv_file_path, 'w') as f_output_tsv:
                 output_header = '\t'.join(self._get_header_for_generating_chemicals_tsv()) + '\n'
                 f_output_tsv.write(output_header)
@@ -597,23 +589,19 @@ class NdexBioGRIDLoader(object):
 
         return tsv_file_path
 
-
-    def _get_CX_file_path_and_name(self, file_path, organism_or_chemical_entry, type='organism'):
-
-        cx_file_path = file_path.replace('.tab2.txt', '.cx') if type == 'organism' else file_path.replace('.chemtab.txt', '.cx')
-
+    def _get_cx_file_path_and_name(self, file_path, organism_or_chemical_entry, type='organism'):
+        cx_file_path = file_path.replace('.tab2.txt', '.cx') if type == 'organism' else file_path.replace('.chemtab.txt',
+                                                                                                          '.cx')
         cx_file_name_indx = cx_file_path.find(organism_or_chemical_entry[0])
 
         cx_file_name = cx_file_path[cx_file_name_indx:]
 
         return cx_file_path, cx_file_name
 
-
-    def _get_CX_filename(self, path_to_network_in_CX, network_name):
-        cx_file_name_indx = path_to_network_in_CX.find(path_to_network_in_CX)
-        cx_file_name = path_to_network_in_CX[cx_file_name_indx:]
+    def _get_cx_filename(self, path_to_network_in_cx, network_name):
+        cx_file_name_indx = path_to_network_in_cx.find(path_to_network_in_cx)
+        cx_file_name = path_to_network_in_cx[cx_file_name_indx:]
         return cx_file_name
-
 
     def _merge_attributes(self, attribute_list_1, attribute_list_2):
 
@@ -634,7 +622,6 @@ class NdexBioGRIDLoader(object):
                 # attriubute with the samae name and value; do not add
                 continue
 
-
             if not 'd' in attribute1:
                 attribute1['d'] = 'list_of_string'
             elif attribute1['d'] == 'boolean':
@@ -648,7 +635,6 @@ class NdexBioGRIDLoader(object):
             elif attribute1['d'] == 'string':
                 attribute1['d'] = 'list_of_string'
 
-
             new_list_of_values = []
 
             if isinstance(attribute1['v'], list):
@@ -659,7 +645,6 @@ class NdexBioGRIDLoader(object):
                 if attribute1['v'] not in new_list_of_values and attribute1['v']:
                     new_list_of_values.append(attribute1['v'])
 
-
             if isinstance(attribute2['v'], list):
                 for value in attribute2['v']:
                     if value not in new_list_of_values and value:
@@ -669,8 +654,6 @@ class NdexBioGRIDLoader(object):
                     new_list_of_values.append(attribute2['v'])
 
             attribute1['v'] = new_list_of_values
-
-
 
     def _collapse_edges(self):
 
@@ -683,26 +666,22 @@ class NdexBioGRIDLoader(object):
             edge_key = (edge['s'], edge['i'], edge['t'])
             edge_key_reverse = (edge['t'], edge['i'], edge['s'])
 
-
             if edge_key in unique_edges:
-                if (edge_id not in unique_edges[edge_key]):
+                if edge_id not in unique_edges[edge_key]:
                     unique_edges[edge_key].append(edge_id)
 
             elif edge_key_reverse in unique_edges:
-                if (edge_id not in unique_edges[edge_key_reverse]):
+                if edge_id not in unique_edges[edge_key_reverse]:
                     unique_edges[edge_key_reverse].append(edge_id)
-
             else:
                 unique_edges[edge_key] = [edge_id]
 
-
-        print(len(unique_edges))
+        logger.info(len(unique_edges))
 
         # build collapsed edges and collapsed edges attributes
         # and then use them to replace self._network.edges and self._network.edgeAttributes
         collapsed_edges = {}
-        collapsed_edgeAttributes = {}
-
+        collapsed_edge_attributes = {}
 
         # create a new edges aspect in collapsed_edges
         for key, list_of_edge_attribute_ids in unique_edges.items():
@@ -710,10 +689,9 @@ class NdexBioGRIDLoader(object):
             collapsed_edges[edge_id] = self._network.edges[edge_id]
 
             if not list_of_edge_attribute_ids:
-                collapsed_edgeAttributes[edge_id] = self._network.edgeAttributes[edge_id]
+                collapsed_edge_attributes[edge_id] = self._network.edgeAttributes[edge_id]
                 del self._network.edgeAttributes[edge_id]
                 continue
-
 
             attribute_list = self._network.edgeAttributes[edge_id]
 
@@ -725,28 +703,26 @@ class NdexBioGRIDLoader(object):
 
                 self._merge_attributes(attribute_list, attribute_list_for_adding)
 
-                collapsed_edgeAttributes[edge_id] = attribute_list
+                collapsed_edge_attributes[edge_id] = attribute_list
 
         del self._network.edges
         self._network.edges = collapsed_edges
 
         del self._network.edgeAttributes
-        self._network.edgeAttributes = collapsed_edgeAttributes
+        self._network.edgeAttributes = collapsed_edge_attributes
 
+    def _using_panda_generate_nice_cx(self, biogrid_file_path, organism_entry, template_network, type='organism'):
 
-    def _using_panda_generate_nice_CX(self, biogrid_file_path, organism_entry, template_network, type='organism'):
+        tsv_file_path = self._generate_tsv_from_biogrid_organism_file(biogrid_file_path) if type == 'organism' else \
+            self._generate_tsv_from_biogrid_chemicals_file(biogrid_file_path)
 
-        tsv_file_path = self._generate_TSV_from_biogrid_organism_file(biogrid_file_path) if type == 'organism' else \
-            self._generate_TSV_from_biogrid_chemicals_file(biogrid_file_path)
-
-        cx_file_path, cx_file_name = self._get_CX_file_path_and_name(biogrid_file_path, organism_entry, type)
-        print('\n{} - started generating {}...'.format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")), cx_file_name))
+        cx_file_path, cx_file_name = self._get_cx_file_path_and_name(biogrid_file_path, organism_entry, type)
+        logger.info('started generating {}...'.format(cx_file_name))
 
         load_plan = self._organism_load_plan if type == 'organism' else self._chem_load_plan
 
         with open(load_plan, 'r') as lp:
             plan = json.load(lp)
-
 
         dataframe = pd.read_csv(tsv_file_path,
                                 dtype=str,
@@ -756,14 +732,12 @@ class NdexBioGRIDLoader(object):
 
         network = t2n.convert_pandas_to_nice_cx_with_load_plan(dataframe, plan)
 
-        organism = organism_entry[1]
-
         if type == 'organism':
             network_name = "BioGRID: Protein-Protein Interactions (" + organism_entry[2] + ")"
-            networkType = ['interactome', 'ppi']
+            network_type = ['interactome', 'ppi']
         else:
             network_name = "BioGRID: Protein-Chemical Interactions (" + organism_entry[2] + ")"
-            networkType = ['proteinassociation', 'compoundassociation']
+            network_type = ['proteinassociation', 'compoundassociation']
 
         network.set_name(network_name)
 
@@ -774,59 +748,72 @@ class NdexBioGRIDLoader(object):
                                       template_network.get_network_attribute('reference')['v'])
         network.set_network_attribute("version", self._biogrid_version)
         network.set_network_attribute("organism", organism_entry[1])
-        network.set_network_attribute("networkType", networkType, 'list_of_string')
-        network.set_network_attribute("__iconurl", "https://home.ndexbio.org/img/biogrid_logo.jpg")
+        network.set_network_attribute("networkType", network_type,
+                                      'list_of_string')
+        network.set_network_attribute("__iconurl",
+                                      "https://home.ndexbio.org"
+                                      "/img/biogrid_logo.jpg")
 
         network.apply_style_from_network(template_network)
 
-
         self._network = network
 
-        #with open(cx_file_path, 'w') as f:
-        #    json.dump(network.to_cx(), f, indent=4)
-
         # note, CX file is in memory, but it is not written to file yet
-        print('{} - finished generating {}'.format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),  cx_file_name))
+        logger.info(cx_file_name + ' - finished generating')
 
         # return path where to write CX file abd network name
         return cx_file_path, network_name
 
+    def _upload_cx(self, path_to_network_in_cx, network_name):
+        if self._args.skipupload is True:
+            logger.info('Skipping upload of "' + network_name +
+                        '" network since --skipupload flag is set')
+            return 0
+        network_uuid = self._network_summaries.get(network_name.upper())
 
+        return self._update_or_upload_with_retry(cxfile=path_to_network_in_cx,
+                                                 network_name=network_name,
+                                                 network_uuid=network_uuid,
+                                                 maxretries=self._args.maxretries,
+                                                 retry_sleep=self._args.retry_sleep)
 
-    def _upload_CX(self, path_to_network_in_CX, network_name):
+    def _update_or_upload_with_retry(self, cxfile=None,
+                                     network_name=None,
+                                     network_uuid=None,
+                                     maxretries=2,
+                                     retry_sleep=5):
+        """
 
-        network_UUID = self._network_summaries.get(network_name.upper())
-
-        cx_file_name = self._get_CX_filename(path_to_network_in_CX, network_name)
-
-        with open(path_to_network_in_CX, 'br') as network_out:
-            try:
-                if network_UUID is None:
-                    print('\n{} - started uploading "{}" on {} for user {}...'.
-                          format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")), network_name,
-                                 self._server, self._user))
-                    self._ndex.save_cx_stream_as_new_network(network_out)
-                    print('{} - finished uploading "{}" on {} for user {}'.
-                          format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")), network_name,
-                                 self._server, self._user))
-                else:
-                    print('\n{} - started updating "{}" on {} for user {}...'.
-                          format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")), network_name,
-                                 self._server, self._user))
-                    self._ndex.update_cx_network(network_out, network_UUID)
-                    print('{} - finished updating "{}" on {} for user {}'.
-                          format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")), network_name,
-                                 self._server, self._user))
-
-            except Exception as e:
-                print('{} - unable to update or upload "{}" on {} for user {}'.
-                      format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")), network_name,
-                             self._server, self._user))
-                print(e)
-                return 2
-
-        return 0
-
+        :param cxfile: Path to CX file to upload
+        :param network_name: name of network (for logging purposes)
+        :param network_uuid: If set method will attempt to update network
+                             with UUID passed in. If `None` then new network
+                             will be uploaded to NDEx
+        :param maxretries: number of retries before giving up
+        :return: 0 upon success, 2 upon failure
+        :rtype: int
+        """
+        retry_count = 1
+        while retry_count <= maxretries:
+            logger.debug('Attempting upload of network try # ' +
+                         str(retry_count))
+            with open(cxfile, 'rb') as network_out:
+                try:
+                    if network_uuid is None:
+                        self._ndex.save_cx_stream_as_new_network(network_out)
+                    else:
+                        self._ndex.update_cx_network(network_out, network_uuid)
+                    return 0
+                except Exception as e:
+                    logger.info('Caught exception attempting to '
+                                'upload network : ' + str(e))
+                    logger.debug('Sleeping ' + str(retry_sleep) +
+                                 ' seconds')
+                    time.sleep(retry_sleep)
+            retry_count += 1
+        logger.error('Unable to upload ' + str(network_name) +
+                     ' network after ' + str(maxretries) + ' retries.')
+        return 2
 
     def _check_if_data_dir_exists(self):
         data_dir_existed = True
@@ -837,20 +824,16 @@ class NdexBioGRIDLoader(object):
 
         return data_dir_existed
 
-
-
     def _write_nice_cx_to_file(self, cx_file_path):
 
-        print('{} - started writing network "{}" to disk...'.
-              format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")), self._network.get_name()))
+        logger.info('started writing network "{}" to disk...'.
+                    format(self._network.get_name()))
 
         with open(cx_file_path, 'w') as f:
-            json.dump(self._network.to_cx(), f, indent=4)
+            json.dump(self._network.to_cx(), f)
 
-        print('{} - finished writing network "{}" to disk'.
-              format(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")), self._network.get_name()))
-
-
+        logger.info('finished writing network "{}" to disk'.
+                    format(self._network.get_name()))
 
     def run(self):
         """
@@ -865,68 +848,128 @@ class NdexBioGRIDLoader(object):
         data_dir_existed = self._check_if_data_dir_exists()
 
         if self._skipdownload is False or data_dir_existed is False:
+            logger.info('Downloading biogrid files')
             download_status = self._download_biogrid_files()
             if download_status != 0:
                 return download_status
-
 
         net_summaries, status_code = self._load_network_summaries_for_user()
         if status_code != 0:
             return status_code
 
-
         self._load_organism_style_template()
         self._load_chemical_style_template()
-
+        upload_exit_codes = set()
         organism_file_entries = self._get_organism_or_chemicals_file_content('organism')
-
-
-        for entry in organism_file_entries:
+        for entry in tqdm(organism_file_entries,
+                          desc='Organisms',
+                          disable=self._args.noprogressbar):
             file_name = self._get_biogrid_file_name(entry)
 
-            status_code, biogrid_organism_file_path = self._unzip_biogrid_file(file_name, 'organism')
+            logger.debug('Unzipping biogrid file: ' + file_name)
+            status_code,\
+                biogrid_organism_file_path = self._unzip_biogrid_file(file_name,
+                                                                      'organism')
 
             if status_code == 0:
 
-                cx_file_path, network_name = self._using_panda_generate_nice_CX(biogrid_organism_file_path,
-                                                                  entry, self._organism_style_template, 'organism')
+                logger.info('Creating CX for ' + str(entry))
+                cx_file_path,\
+                    network_name = self._using_panda_generate_nice_cx(biogrid_organism_file_path,
+                                                                      entry, self._organism_style_template, 'organism')
 
                 self._collapse_edges()
-
+                logger.info('Applying spring layout for ' + str(entry))
+                self._apply_simple_spring_layout(self._network)
+                logger.info('Writing CX to file for ' + str(entry))
                 self._write_nice_cx_to_file(cx_file_path)
-
-                status_code1 = self._upload_CX(cx_file_path, network_name)
-
+                logger.info('Uploading CX to NDEx for ' + str(entry))
+                upload_exit_codes.add(self._upload_cx(cx_file_path,
+                                                      network_name))
             else:
+                upload_exit_codes.add(9)
                 logger.error('Unable to extract ' + file_name + ' from archive')
-
-
-
 
         chemical_file_entries = self._get_organism_or_chemicals_file_content('chemicals')
 
-
-        for entry in chemical_file_entries:
+        for entry in tqdm(chemical_file_entries, desc='Chemicals',
+                          disable=self._args.noprogressbar):
             file_name = self._get_biogrid_chemicals_file_name(entry)
 
-            status_code, biogrid_chemicals_file_path = self._unzip_biogrid_file(file_name, 'chemicals')
+            status_code, biogrid_chemicals_file_path = self._unzip_biogrid_file(file_name,
+                                                                                'chemicals')
 
             if status_code == 0:
-
-                cx_file_path, network_name = self._using_panda_generate_nice_CX(biogrid_chemicals_file_path, entry,
-                                                                    self._chem_style_template, 'chemical')
-
+                logger.info('Creating CX for ' + str(entry))
+                cx_file_path,\
+                    network_name = self._using_panda_generate_nice_cx(biogrid_chemicals_file_path,
+                                                                      entry,
+                                                                      self._chem_style_template,
+                                                                      'chemical')
                 self._collapse_edges()
-
+                logger.info('Applying spring layout for ' + str(entry))
+                self._apply_simple_spring_layout(self._network)
+                logger.info('Writing CX to file for ' + str(entry))
                 self._write_nice_cx_to_file(cx_file_path)
-
-                status_code1 = self._upload_CX(cx_file_path, network_name)
-
+                logger.info('Uploading CX to NDEx for ' + str(entry))
+                upload_exit_codes.add(self._upload_cx(cx_file_path,
+                                                      network_name))
             else:
+                upload_exit_codes.add(10)
                 logger.error('Unable to extract ' + file_name + ' from archive')
+        return max(upload_exit_codes)
 
+    def _apply_simple_spring_layout(self, network, iterations=20):
+        """
+        Applies simple spring network by using
+        :py:func:`networkx.drawing.spring_layout` and putting the
+        coordinates into 'cartesianLayout' aspect on the 'network' passed
+        in
 
-        return 0
+        :param network: Network to update
+        :type network: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
+        :param iterations: Number of iterations to use for networkx spring
+                           layout call
+        :type iterations: int
+        :return: None
+        """
+        num_nodes = len(network.get_nodes())
+        logger.debug('Converting network to networkx')
+        my_networkx = network.to_networkx(mode='default')
+        if num_nodes < 10:
+            nodescale = num_nodes*20
+        elif num_nodes < 20:
+            nodescale = num_nodes*15
+        elif num_nodes < 100:
+            nodescale = num_nodes*10
+        else:
+            nodescale = num_nodes*5
+        logger.debug('Applying spring layout')
+        my_networkx.pos = nx.drawing.spring_layout(my_networkx,
+                                                   scale=nodescale,
+                                                   k=1.8,
+                                                   iterations=iterations)
+        cartesian_aspect = self._cartesian(my_networkx)
+        network.set_opaque_aspect("cartesianLayout", cartesian_aspect)
+        del my_networkx
+
+    def _cartesian(self, g):
+        """
+        Converts node coordinates from a :py:class:`networkx.Graph` object
+        to a list of dicts with following format:
+
+        [{'node': <node id>,
+          'x': <x position>,
+          'y': <y position>}]
+
+        :param g:
+        :return: coordinates
+        :rtype: list
+        """
+        return [{'node': n,
+                 'x': float(g.pos[n][0]),
+                 'y': float(g.pos[n][1])} for n in g.pos]
+
 
 def main(args):
     """
@@ -966,8 +1009,7 @@ def main(args):
         loader = NdexBioGRIDLoader(theargs)
         return loader.run()
     except Exception as e:
-        logger.exception('Caught exception')
-        print('\n\n\tException: {}\n'.format(e))
+        logger.exception('Caught exception', e)
         return 2
     finally:
         logging.shutdown()

@@ -66,7 +66,7 @@ class TestNdexbiogridloader(unittest.TestCase):
         pargs = ndexloadbiogrid._parse_arguments('desc', fakeargs)
         self.assertEqual('datadir', pargs.datadir)
         self.assertEqual('ndexbiogridloader', pargs.profile)
-        self.assertEqual('3.5.187', pargs.biogridversion)
+        self.assertEqual('4.2.191', pargs.biogridversion)
         self.assertEqual(ndexloadbiogrid.get_organism_load_plan(),
                          pargs.organismloadplan)
         self.assertEqual(ndexloadbiogrid.get_chemical_load_plan(),

@@ -923,7 +923,7 @@ class NdexBioGRIDLoader(object):
                 logger.error('Unable to extract ' + file_name + ' from archive')
         return max(upload_exit_codes)
 
-    def _apply_simple_spring_layout(self, network, iterations=20):
+    def _apply_simple_spring_layout(self, network, iterations=5):
         """
         Applies simple spring network by using
         :py:func:`networkx.drawing.spring_layout` and putting the

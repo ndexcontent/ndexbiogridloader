@@ -1,19 +1,27 @@
 #! /usr/bin/env python
 
+import os
+import zipfile
 import argparse
 import sys
 import logging
 import time
+import tempfile
+import shutil
 from logging import config
+import requests
+
 from ndexutil.config import NDExUtilConfig
 import ndexbiogridloader
-import requests
-import os
-import zipfile
+from ndexbiogridloader.exceptions import NdexBioGRIDLoaderError
 import ndex2
 from ndex2.client import Ndex2
 import networkx as nx
+from ndexutil.cytoscape import Py4CytoscapeWrapper
+from ndexutil.cytoscape import DEFAULT_CYREST_API
+from ndexutil.ndex import NDExExtraUtils
 from tqdm import tqdm
+
 
 
 logger = logging.getLogger(__name__)
@@ -221,7 +229,18 @@ def _parse_arguments(desc, args):
     parser.add_argument('--retry_sleep', type=int, default=30,
                         help='Number of seconds to wait between '
                              'retry of failed upload of network to NDEx')
-
+    parser.add_argument('--layout', default='-',
+                        help='Specifies layout '
+                             'algorithm to run. If Cytoscape is running '
+                             'and py4cytoscape is loaded any layout from '
+                             'Cytoscape can be used. If "-" is passed in '
+                             'force-directed-cl from Cytoscape will '
+                             'be used. If no Cytoscape is available, '
+                             '"spring" from networkx is supported')
+    parser.add_argument('--cyresturl',
+                        default=DEFAULT_CYREST_API,
+                        help='URL of CyREST API. Default value '
+                             'is default for locally running Cytoscape')
     return parser.parse_args(args)
 
 
@@ -266,7 +285,9 @@ class NdexBioGRIDLoader(object):
     """
     Class to load content
     """
-    def __init__(self, args):
+    def __init__(self, args,
+                 py4cyto=Py4CytoscapeWrapper(),
+                 ndexextra=NDExExtraUtils()):
         """
 
         :param args:
@@ -289,15 +310,15 @@ class NdexBioGRIDLoader(object):
 
         self._biogrid_version = args.biogridversion
 
-        self._datadir = os.path.abspath(args.datadir)
-
         self._organism_file_name = os.path.join(self._datadir, 'organism.zip')
         self._chemicals_file_name = os.path.join(self._datadir, 'chemicals.zip')
 
-        self._biogrid_organism_file_ext = '-' + self._biogrid_version  + '.tab2.txt'
+        self._biogrid_organism_file_ext = '-' + self._biogrid_version + '.tab2.txt'
         self._biogrid_chemicals_file_ext = '-' + self._biogrid_version + '.chemtab.txt'
         self._skipdownload = args.skipdownload
         self._network = None
+        self._py4 = py4cyto
+        self._ndexextra = ndexextra
 
     def _load_chemical_style_template(self):
         """
@@ -883,8 +904,14 @@ class NdexBioGRIDLoader(object):
                                                                       entry, self._organism_style_template, 'organism')
 
                 self._collapse_edges()
-                logger.info('Applying spring layout for ' + str(entry))
-                self._apply_simple_spring_layout(self._network)
+                if self._args.layout is not None:
+                    if self._args.layout == 'spring':
+                        logger.info('Applying spring layout for ' + str(entry))
+                        self._apply_simple_spring_layout(self._network)
+                    else:
+                        if self._args.layout == '-':
+                            self._args.layout = 'force-directed-cl'
+                        self._apply_cytoscape_layout(self._network)
                 logger.info('Writing CX to file for ' + str(entry))
                 self._write_nice_cx_to_file(cx_file_path)
                 logger.info('Uploading CX to NDEx for ' + str(entry))
@@ -911,8 +938,15 @@ class NdexBioGRIDLoader(object):
                                                                       self._chem_style_template,
                                                                       'chemical')
                 self._collapse_edges()
-                logger.info('Applying spring layout for ' + str(entry))
-                self._apply_simple_spring_layout(self._network)
+                if self._args.layout is not None:
+                    if self._args.layout == 'spring':
+                        logger.info('Applying spring layout for ' + str(entry))
+                        self._apply_simple_spring_layout(self._network)
+                    else:
+                        if self._args.layout == '-':
+                            self._args.layout = 'force-directed-cl'
+                        self._apply_cytoscape_layout(self._network)
+
                 logger.info('Writing CX to file for ' + str(entry))
                 self._write_nice_cx_to_file(cx_file_path)
                 logger.info('Uploading CX to NDEx for ' + str(entry))
@@ -973,6 +1007,69 @@ class NdexBioGRIDLoader(object):
         return [{'node': n,
                  'x': float(g.pos[n][0]),
                  'y': float(g.pos[n][1])} for n in g.pos]
+
+    def _apply_cytoscape_layout(self, network):
+        """
+        Applies Cytoscape layout on network
+        :param network:
+        :return:
+        """
+        try:
+            self._py4.cytoscape_ping()
+        except Exception as e:
+            raise NdexBioGRIDLoaderError('Cytoscape needs to be running to run '
+                                         'layout: ' + str(self._args.layout))
+
+        temp_dir = tempfile.mkdtemp(dir=self._datadir)
+        try:
+            tmp_cx_file = os.path.join(temp_dir, 'tmp.cx')
+
+            with open(tmp_cx_file, 'w') as f:
+                json.dump(network.to_cx(), f)
+
+            annotated_cx_file = os.path.join(temp_dir, 'annotated.tmp.cx')
+
+            self._ndexextra.add_node_id_as_node_attribute(cxfile=tmp_cx_file,
+                                                          outcxfile=annotated_cx_file)
+            file_size = os.path.getsize(annotated_cx_file)
+
+            logger.info('Importing network from file: ' + annotated_cx_file +
+                        ' (' + str(file_size) + ' bytes) into Cytoscape')
+            net_dict = self._py4.import_network_from_file(annotated_cx_file,
+                                                          base_url=self._args.cyresturl)
+            if 'networks' not in net_dict:
+                raise NdexBioGRIDLoaderError('Error network view could not '
+                                             'be created, this could be cause '
+                                             'this network is larger then '
+                                             '100,000 edges. Try increasing '
+                                             'viewThreshold property in '
+                                             'Cytoscape preferences')
+
+            os.unlink(annotated_cx_file)
+            net_suid = net_dict['networks'][0]
+
+            logger.info('Applying layout ' + self._args.layout +
+                        ' on network with suid: ' +
+                        str(net_suid) + ' in Cytoscape')
+            res = self._py4.layout_network(layout_name=self._args.layout,
+                                           network=net_suid,
+                                           base_url=self._args.cyresturl)
+            logger.debug(res)
+
+            os.unlink(tmp_cx_file)
+
+            logger.info('Writing cx to: ' + tmp_cx_file)
+            res = self._py4.export_network(filename=tmp_cx_file, type='CX',
+                                           network=net_suid,
+                                           base_url=self._args.cyresturl)
+            self._py4.delete_network(network=net_suid,
+                                     base_url=self._args.cyresturl)
+            logger.debug(res)
+
+            layout_aspect = self._ndexextra.extract_layout_aspect_from_cx(input_cx_file=tmp_cx_file)
+            network.set_opaque_aspect('cartesianLayout', layout_aspect)
+        finally:
+            shutil.rmtree(temp_dir)
 
 
 def main(args):

@@ -24,7 +24,8 @@ requirements = ['ndex2>=3.1.0a1,<=4.0.0',
                 'pandas',
                 'networkx',
                 'scipy',
-                'tqdm']
+                'tqdm',
+                'py4cytoscape']
 
 setup_requirements = [ ]
 

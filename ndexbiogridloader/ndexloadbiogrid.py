@@ -232,8 +232,8 @@ def _parse_arguments(desc, args):
     parser.add_argument('--layout', default='-',
                         help='Specifies layout '
                              'algorithm to run. If Cytoscape is running '
-                             'and py4cytoscape is loaded any layout from '
-                             'Cytoscape can be used. If "-" is passed in '
+                             'any layout from Cytoscape can be used. If '
+                             'this flag is omitted or "-" is passed in '
                              'force-directed-cl from Cytoscape will '
                              'be used. If no Cytoscape is available, '
                              '"spring" from networkx is supported')
@@ -1095,6 +1095,9 @@ def main(args):
     {password} = <NDEx password>
     {server} = <NDEx server(omit http) ie public.ndexbio.org>
 
+    By default Cytoscape must be running to generate the layout for each 
+    network. To avoid this requirement add this flag to use networkx 
+    spring layout: --layout spring
 
     """.format(confname=NDExUtilConfig.CONFIG_FILE,
                user=NDExUtilConfig.USER,

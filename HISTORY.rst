@@ -2,7 +2,7 @@
 History
 =======
 
-1.0.0 (11-05-2020)
+1.0.0 (11-09-2020)
 ------------------
 
 * New default behavior: **force-directed-cl** layout is now applied on

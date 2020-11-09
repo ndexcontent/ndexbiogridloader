@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 import unittest
 import ndex2
 from ndex2.nice_cx_network import NiceCXNetwork
-from ndexutil.config import NDExUtilConfig
+from ndexbiogridloader.exceptions import NdexBioGRIDLoaderError
 from ndexbiogridloader import ndexloadbiogrid
 from ndexbiogridloader.ndexloadbiogrid import NdexBioGRIDLoader
 
@@ -240,6 +240,61 @@ class TestNdexbiogridloader(unittest.TestCase):
         finally:
             shutil.rmtree(temp_dir)
 
+    def test_apply_cytoscape_layout_ping_failed(self):
+        p = MagicMock()
+        p.datadir = '/foo'
+        p.layout = 'grid'
+        mockpy4 = MagicMock()
+        mockpy4.cytoscape_ping = MagicMock(side_effect=Exception('error'))
+        loader = NdexBioGRIDLoader(p, py4cyto=mockpy4)
+        net = NiceCXNetwork()
+        try:
+            loader._apply_cytoscape_layout(net)
+            self.fail('Expected NdexBioGRIDLoaderError')
+        except NdexBioGRIDLoaderError as e:
+            self.assertEqual('Cytoscape needs to be running '
+                             'to run layout: grid', str(e))
+
+    def test_apply_cytoscape_layout_networks_not_in_dict(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            p = MagicMock()
+            p.layout = 'grid'
+            p.datadir = temp_dir
+            mockpy4 = MagicMock()
+            mockpy4.import_network_from_file = MagicMock(return_value={})
+            loader = NdexBioGRIDLoader(p, py4cyto=mockpy4)
+            net = NiceCXNetwork()
+            for x in range(10):
+                net.create_node('node' + str(x))
+            try:
+                loader._apply_cytoscape_layout(net)
+                self.fail('Expected NdexBioGRIDLoaderError')
+            except NdexBioGRIDLoaderError as e:
+                self.assertTrue(str(e).startswith('Error network view'))
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_apply_cytoscape_layout_networks_success(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            p = MagicMock()
+            p.layout = 'grid'
+            p.datadir = temp_dir
+            mockpy4 = MagicMock()
+            imp_res = {'networks': ['netid']}
+            mockpy4.import_network_from_file = MagicMock(return_value=imp_res)
+            mockpy4.export_network = MagicMock(return_value='')
+            loader = NdexBioGRIDLoader(p, py4cyto=mockpy4)
+            loader._ndexextra.extract_layout_aspect_from_cx = MagicMock(return_value={'cartesianLayout': []})
+            net = NiceCXNetwork()
+            for x in range(10):
+                net.create_node('node' + str(x))
+            loader._apply_cytoscape_layout(net)
+            self.assertEqual([{'cartesianLayout': []}],
+                             net.get_opaque_aspect('cartesianLayout'))
+        finally:
+            shutil.rmtree(temp_dir)
 
     @unittest.skip("skipping test_10")
     def test_10_using_panda_generate_organism_CX_and_upload(self):

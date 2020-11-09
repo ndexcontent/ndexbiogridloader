@@ -21,11 +21,11 @@ Python application for loading BioGRID data into `NDEx <http://ndexbio.org>`_.
 
 This tool downloads and unpacks the `BioGRID <https://thebiogrid.org/>`_ files below
 
-    `BIOGRID-ORGANISM-3.5.187.tab2.zip <https://downloads.thebiogrid.org/Download/BioGRID/Release-Archive/BIOGRID-3.5.187/BIOGRID-ORGANISM-3.5.87.tab2.zip>`_
+    `BIOGRID-ORGANISM-4.2.191.tab2.zip <https://downloads.thebiogrid.org/Download/BioGRID/Release-Archive/BIOGRID-3.5.187/BIOGRID-ORGANISM-3.5.87.tab2.zip>`_
 
-    `BIOGRID-CHEMICALS-3.5.187.chemtab.zip <https://downloads.thebiogrid.org/Download/BioGRID/Release-Archive/BIOGRID-3.5.187/BIOGRID-CHEMICALS-3.5.187.chemtab.zip>`_
+    `BIOGRID-CHEMICALS-4.2.191.chemtab.zip <https://downloads.thebiogrid.org/Download/BioGRID/Release-Archive/BIOGRID-3.5.187/BIOGRID-CHEMICALS-3.5.187.chemtab.zip>`_
 
-**NOTE:** ``ndexloadbiogrid.py`` script ``--biogridversion`` parameter dictates version (``3.5.187`` above)
+**NOTE:** ``ndexloadbiogrid.py`` script ``--biogridversion`` parameter dictates version (``4.2.191`` above)
 
 
 
@@ -36,14 +36,28 @@ Dependencies
 
 * `ndex2 <https://pypi.org/project/ndex2>`_
 * `ndexutil <https://pypi.org/project/ndexutil>`_
+* `requests <https://pypi.org/project/requests>`_
+* `pandas <https://pypi.org/project/pandas>`_
+* `networkx <https://pypi.org/project/networkx>`_
+* `scipy <https://pypi.org/project/scipy>`_
+* `tqdm <https://pypi.org/project/tqdm>`_
+* `py4cytoscape <https://pypi.org/project/py4cytoscape>`_
 
 Compatibility
 -------------
 
-* Python 3.3+
+* Python 3.6+
 
 Installation
 ------------
+
+From PyPi:
+
+.. code-block::
+
+   pip install ndexbiogridloader
+
+Build from source:
 
 .. code-block::
 
@@ -114,7 +128,7 @@ Usage
 
 For information invoke :code:`ndexloadbiogrid.py -h`
 
-The command shown below will download the default version of BioGRID files (3.5.178) to the working
+The command shown below will download the default version of BioGRID files (4.2.191) to the working
 directory :code:`biogrid_data`, will generate CX networks in this directory, and then upload these networks
 to default account specified in :code:`[ndexbiogridloader]` section of default configuration file:
 
@@ -123,6 +137,10 @@ to default account specified in :code:`[ndexbiogridloader]` section of default c
    ndexloadbiogrid.py biogrid_data
 
 
+.. note::
+
+   By default Cytoscape must be running to generate the layout for each network. See ``--layout`` flag
+   options to generate networks without Cytoscape.
 
 
 Credits

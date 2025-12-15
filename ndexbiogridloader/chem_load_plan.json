@@ -48,7 +48,8 @@
         "default_predicate": "affects",
         "property_columns": [
                {
-                    "column_name": "Action"
+                    "column_name": "Action",
+                    "delimiter": "|"
                 },
                 {
                     "column_name": "Pubmed ID",
